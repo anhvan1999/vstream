@@ -117,7 +117,13 @@ public struct TorboxProvider: DebridProvider {
             multipart: [("magnet", request.magnet), ("add_only_if_cached", "true"), ("allow_zip", "false")]
         )
         guard created["success"] as? Bool != false else {
-            throw DebridError.api(created["detail"] as? String ?? "TorBox rejected the torrent")
+            let detail = created["detail"] as? String
+            // With `add_only_if_cached`, an uncached torrent fails with DOWNLOAD_NOT_CACHED
+            // ("Download not cached…"); report it as such so automatic mode falls back to P2P.
+            if created["error"] as? String == "DOWNLOAD_NOT_CACHED" || detail?.range(of: "not cached", options: .caseInsensitive) != nil {
+                throw DebridError.notCached
+            }
+            throw DebridError.api(detail ?? "TorBox rejected the torrent")
         }
         let data = created["data"] as? [String: Any] ?? [:]
         guard let torrentID = data.int("torrent_id") ?? data.int("id") else { throw DebridError.notCached }

@@ -16,6 +16,7 @@ struct PlayLinkView: View {
     @State private var isDropTargeted = false
     @State private var showsAllFiles = false
     @State private var work: Task<Void, Never>?
+    @State private var lastOpened: (link: String, at: Date)?
     @FocusState private var fieldFocused: Bool
 
     private enum Phase {
@@ -320,6 +321,9 @@ struct PlayLinkView: View {
             phase = .failed("That doesn't look like a video URL, magnet link or .torrent file")
             return
         }
+        // A paste can arrive as both a field change and a submit; open each link once.
+        if lastOpened?.link == link.raw, Date().timeIntervalSince(lastOpened!.at) < 2 { return }
+        lastOpened = (link.raw, Date())
         work?.cancel()
         showsAllFiles = false
         input = ""
