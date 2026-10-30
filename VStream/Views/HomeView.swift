@@ -21,6 +21,11 @@ struct HomeView: View {
                     ScreenHeader(title: "Home")
                 }
                 ContinueWatchingShelf()
+                if app.trakt.isConnected {
+                    ForEach(TraktAccount.List.allCases, id: \.self) { list in
+                        TraktShelf(list: list)
+                    }
+                }
                 ForEach(rows) { row in
                     CatalogShelf(row: row) { metas in
                         if featured.isEmpty {
@@ -227,10 +232,12 @@ struct CatalogShelf: View {
 
     @State private var metas: [MetaPreview] = []
     @State private var failed = false
+    @State private var loaded = false
 
     var body: some View {
         Group {
-            if !metas.isEmpty || !failed {
+            // Hide rows that failed or came back empty (e.g. an expired list addon).
+            if !metas.isEmpty || !(failed || loaded) {
                 Shelf(title: row.title) {
                     NavigationLink("See All") { CatalogGridView(row: row) }
                         .buttonStyle(.glass)
@@ -257,9 +264,30 @@ struct CatalogShelf: View {
             do {
                 let page = try await app.content.page(row)
                 metas = page.metas
+                loaded = true
                 onLoaded(page.metas)
             } catch {
                 failed = true
+            }
+        }
+    }
+}
+
+/// A row fed by the user's own Trakt connection (independent of Stremio's Trakt addon).
+/// Data lives in `TraktAccount.lists`; empty lists show nothing.
+struct TraktShelf: View {
+    @Environment(AppModel.self) private var app
+    var list: TraktAccount.List
+
+    var body: some View {
+        if let metas = app.trakt.lists[list], !metas.isEmpty {
+            Shelf(title: list.title) {
+                ForEach(metas) { meta in
+                    Button { app.open(meta) } label: {
+                        PosterCard(title: meta.name, poster: meta.poster, width: 150, subtitle: meta.releaseInfo)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
     }

@@ -1,6 +1,7 @@
 import AddonKit
 import Foundation
 import Observation
+import OSLog
 import StremioAPI
 import TraktKit
 
@@ -11,6 +12,10 @@ public final class TraktAccount {
     public private(set) var isWaitingForBrowser = false
     public private(set) var isSyncing = false
     public private(set) var lastError: String?
+    /// Trakt lists for Home, loaded here (not by the views) so scrolling can't cancel them.
+    public private(set) var lists: [List: [MetaPreview]] = [:]
+    @ObservationIgnored private var listsTask: Task<Void, Never>?
+    private nonisolated static let log = Logger(subsystem: "com.vstream.app", category: "trakt")
 
     @ObservationIgnored private let settings: SettingsStore
     @ObservationIgnored private let library: LibraryStore
@@ -61,6 +66,7 @@ public final class TraktAccount {
                 _ = try await client.authorizeInBrowser(openURL: openURL)
                 isConnected = true
                 await importHistory()
+                refreshLists()
             } catch is CancellationError {
             } catch {
                 lastError = error.localizedDescription
@@ -107,6 +113,64 @@ public final class TraktAccount {
             lastError = nil
         } catch {
             lastError = error.localizedDescription
+        }
+    }
+
+    // MARK: Lists
+
+    public enum List: String, CaseIterable, Sendable {
+        case watchlist, recommendedMovies, recommendedShows
+
+        public var title: String {
+            switch self {
+            case .watchlist: "Trakt Watchlist"
+            case .recommendedMovies: "Recommended Movies · Trakt"
+            case .recommendedShows: "Recommended Shows · Trakt"
+            }
+        }
+    }
+
+    /// Loads every list concurrently; failures leave that list as it was.
+    public func refreshLists() {
+        guard isConnected else { lists = [:]; return }
+        listsTask?.cancel()
+        listsTask = Task {
+            await withTaskGroup(of: (List, [MetaPreview]?).self) { group in
+                for list in List.allCases {
+                    group.addTask {
+                        do {
+                            let items = try await self.items(list)
+                            Self.log.notice("trakt \(list.rawValue, privacy: .public): \(items.count, privacy: .public) items")
+                            return (list, items)
+                        } catch {
+                            Self.log.error("trakt \(list.rawValue, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+                            return (list, nil)
+                        }
+                    }
+                }
+                for await (list, items) in group {
+                    if let items { lists[list] = items }
+                }
+            }
+        }
+    }
+
+    /// A Trakt list as catalog items; artwork comes from Cinemeta's image CDN by IMDb id.
+    public func items(_ list: List) async throws -> [MetaPreview] {
+        guard isConnected, let client = makeClient() else { return [] }
+        let entries: [TraktListItem] = switch list {
+        case .watchlist: try await client.watchlist()
+        case .recommendedMovies: try await client.recommendations(.movie)
+        case .recommendedShows: try await client.recommendations(.show)
+        }
+        return entries.map { entry in
+            MetaPreview(
+                id: entry.imdb,
+                type: entry.kind == .movie ? "movie" : "series",
+                name: entry.title,
+                poster: URL(string: "https://images.metahub.space/poster/medium/\(entry.imdb)/img"),
+                releaseInfo: entry.year.map(String.init)
+            )
         }
     }
 

@@ -287,6 +287,16 @@ public actor TraktClient {
         _ = try await send(added ? "sync/watchlist" : "sync/watchlist/remove", body: [key: [["ids": ["imdb": imdb]]]])
     }
 
+    /// Personal recommendations (requires auth). `kind` is `.movie` or `.show`.
+    public func recommendations(_ kind: TraktListItem.Kind, limit: Int = 30) async throws -> [TraktListItem] {
+        let path = kind == .movie ? "recommendations/movies" : "recommendations/shows"
+        let json = try await getJSON("\(path)?limit=\(limit)&ignore_collected=true") as? [[String: Any]] ?? []
+        return json.compactMap { object in
+            guard let imdb = Self.imdb(object) else { return nil }
+            return TraktListItem(kind: kind, imdb: imdb, title: object["title"] as? String ?? "", year: object["year"] as? Int)
+        }
+    }
+
     public func playback() async throws -> [TraktPlayback] {
         let json = try await getJSON("sync/playback") as? [[String: Any]] ?? []
         return json.compactMap { entry in
@@ -390,7 +400,8 @@ public actor TraktClient {
     }
 
     private func makeRequest(_ path: String, method: String, body: [String: Any]?) throws -> URLRequest {
-        var request = URLRequest(url: Self.baseURL.appending(path: path), timeoutInterval: 30)
+        let url = URL(string: path, relativeTo: Self.baseURL)?.absoluteURL ?? Self.baseURL.appending(path: path)
+        var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("2", forHTTPHeaderField: "trakt-api-version")

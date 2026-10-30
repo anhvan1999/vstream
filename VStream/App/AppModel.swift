@@ -62,6 +62,7 @@ final class AppModel {
         await addons.refreshManifests()
         await stremio.sync()
         await trakt.importHistory()
+        trakt.refreshLists()
     }
 
     func open(_ meta: MetaPreview) {
