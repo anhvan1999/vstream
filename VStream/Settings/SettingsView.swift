@@ -82,11 +82,10 @@ private struct AccountsSettings: View {
                         Button("Cancel") { app.trakt.cancelConnect() }
                     }
                 } else {
-                    TextField("Client ID", text: $settings.settings.traktClientID)
-                        .onChange(of: settings.settings.traktClientID) { app.trakt.credentialsChanged() }
                     HStack {
-                        Link("Create a Trakt API app", destination: URL(string: "https://trakt.tv/oauth/applications/new")!)
+                        Text("Scrobble what you watch and sync your history and watchlist.")
                             .font(.caption)
+                            .foregroundStyle(.secondary)
                         Spacer()
                         Button("Connect") {
                             app.trakt.connect { url in
@@ -100,8 +99,6 @@ private struct AccountsSettings: View {
                 if let error = app.trakt.lastError { Text(error).foregroundStyle(.red).font(.caption) }
             } header: {
                 Text("Trakt")
-            } footer: {
-                Text("Set the Trakt app’s redirect URI to “http://localhost:8765/trakt”.")
             }
         }
         .formStyle(.grouped)
