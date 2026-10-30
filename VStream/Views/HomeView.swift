@@ -118,7 +118,8 @@ struct HeroBanner: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             RemoteImage(url: meta.background)
-                .frame(height: 460)
+                // Tall enough to show the artwork rather than a thin crop: ~72% of the window.
+                .containerRelativeFrame(.vertical) { length, _ in max(length * 0.72, 520) }
                 .frame(maxWidth: .infinity)
                 .clipped()
                 .backgroundExtensionEffect()

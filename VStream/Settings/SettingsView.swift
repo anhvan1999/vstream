@@ -168,9 +168,21 @@ private struct PlaybackSettings: View {
                 Toggle("Play next episode automatically", isOn: $settings.settings.autoplayNextEpisode)
                 Toggle("Show adult catalogs", isOn: $settings.settings.showAdultCatalogs)
             }
-            Section("Languages") {
-                TextField("Audio (e.g. vie, eng, jpn)", text: languages(\.preferredAudioLanguages))
-                TextField("Subtitles (e.g. vie, eng)", text: languages(\.preferredSubtitleLanguages))
+            Section {
+                Picker("Default audio language", selection: language(\.preferredAudioLanguages)) {
+                    Text("File default").tag(String?.none)
+                    Divider()
+                    ForEach(Languages.all) { Text($0.name).tag(Optional($0.id)) }
+                }
+                Picker("Default subtitles", selection: language(\.preferredSubtitleLanguages)) {
+                    Text("Off").tag(String?.none)
+                    Divider()
+                    ForEach(Languages.all) { Text($0.name).tag(Optional($0.id)) }
+                }
+            } header: {
+                Text("Languages")
+            } footer: {
+                Text("Picked automatically when a video starts, from the file's tracks or your subtitle addons.")
             }
             Section("Subtitle style") {
                 Slider(value: $settings.settings.subtitleStyle.fontSize, in: 24...80, step: 2) { Text("Size") }
@@ -186,14 +198,17 @@ private struct PlaybackSettings: View {
         }
     }
 
-    private func languages(_ keyPath: WritableKeyPath<AppSettings, [String]>) -> Binding<String> {
+    /// Settings store every code variant of the language so mpv's alang/slang and addon
+    /// subtitles match however they spell it.
+    private func language(_ keyPath: WritableKeyPath<AppSettings, [String]>) -> Binding<String?> {
         Binding(
-            get: { app.settings.settings[keyPath: keyPath].joined(separator: ", ") },
-            set: { value in
-                app.settings.settings[keyPath: keyPath] = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty }
+            get: { Languages.option(for: app.settings.settings[keyPath: keyPath].first)?.id },
+            set: { id in
+                app.settings.settings[keyPath: keyPath] = Languages.all.first { $0.id == id }?.codes ?? []
             }
         )
     }
+
 }
 
 private struct TorrentSettingsView: View {

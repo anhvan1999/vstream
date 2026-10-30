@@ -65,7 +65,10 @@ struct RootView: View {
         } else {
             stream = AddonStream(url: url)
         }
-        app.play(meta: MetaDetail(preview: MetaPreview(id: "debug", type: "movie", name: "Debug playback")), video: nil, stream: stream, recordsProgress: false)
+        // `VSTREAM_DEBUG_META=<type>:<id>` borrows a real title's addon subtitles.
+        let parts = ProcessInfo.processInfo.environment["VSTREAM_DEBUG_META"]?.split(separator: ":", maxSplits: 1).map(String.init)
+        let preview = MetaPreview(id: parts?.last ?? "debug", type: parts?.first ?? "movie", name: "Debug playback")
+        app.play(meta: MetaDetail(preview: preview), video: nil, stream: stream, recordsProgress: false)
         openWindow(id: "player")
     }
     #endif

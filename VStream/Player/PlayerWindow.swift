@@ -33,6 +33,7 @@ private struct PlayerScreen: View {
     @State private var controlsVisible = true
     @State private var isFullScreen = false
     @State private var isScrubbing = false
+    @State private var showsSubtitles = false
     @State private var hideTask: Task<Void, Never>?
     @FocusState private var focused: Bool
 
@@ -262,31 +263,18 @@ private struct PlayerScreen: View {
     }
 
     private var subtitleMenu: some View {
-        Menu {
-            Button {
-                player.selectSubtitle(nil)
-            } label: {
-                if player.selectedSubtitleID == nil { Label("Off", systemImage: "checkmark") } else { Text("Off") }
-            }
-            if !player.subtitleTracks.isEmpty {
-                Section("Subtitles") {
-                    ForEach(player.subtitleTracks) { track in
-                        Button {
-                            player.selectSubtitle(track.id)
-                        } label: {
-                            if player.selectedSubtitleID == track.id { Label(track.displayName, systemImage: "checkmark") } else { Text(track.displayName) }
-                        }
-                    }
-                }
-            }
+        Button {
+            showsSubtitles.toggle()
+            revealControls()
         } label: {
             menuLabel(player.selectedSubtitleID == nil ? "captions.bubble" : "captions.bubble.fill")
         }
-        .menuStyle(.button)
-        .menuIndicator(.hidden)
         .buttonStyle(.plain)
-        .fixedSize()
         .help("Subtitles")
+        .popover(isPresented: $showsSubtitles, arrowEdge: .top) {
+            SubtitlePanel(player: player)
+                .environment(app)
+        }
     }
 
     private var audioMenu: some View {
@@ -308,16 +296,11 @@ private struct PlayerScreen: View {
         .help("Audio")
     }
 
-    /// Less frequent settings: speed, subtitle timing, volume.
+    /// Less frequent settings: speed and volume.
     private var moreMenu: some View {
         Menu {
             Picker("Speed", selection: Binding(get: { player.speed }, set: { player.setSpeed($0) })) {
                 ForEach([0.5, 0.75, 1, 1.25, 1.5, 2], id: \.self) { Text("\($0.formatted())×").tag($0) }
-            }
-            Menu("Subtitle Delay (\(player.subtitleDelay.formatted()) s)") {
-                Button("−0.5 s") { player.setSubtitleDelay(player.subtitleDelay - 0.5) }
-                Button("+0.5 s") { player.setSubtitleDelay(player.subtitleDelay + 0.5) }
-                Button("Reset") { player.setSubtitleDelay(0) }
             }
             Divider()
             Button(player.isMuted ? "Unmute" : "Mute") { player.toggleMute() }
@@ -340,7 +323,7 @@ private struct PlayerScreen: View {
         hideTask?.cancel()
         hideTask = Task {
             try? await Task.sleep(for: .seconds(3))
-            guard !Task.isCancelled, player.isPlaying, !isScrubbing else { return }
+            guard !Task.isCancelled, player.isPlaying, !isScrubbing, !showsSubtitles else { return }
             controlsVisible = false
             NSCursor.setHiddenUntilMouseMoves(true)
         }
@@ -423,6 +406,9 @@ private struct Timeline: View {
                             .fixedSize()
                             .offset(y: -40)
                     }
+                    // Pin the stack to the knob's width (the bubble overflows) so the knob's centre,
+                    // not the wider bubble's, sits exactly at the end of the played fill.
+                    .frame(width: Self.knobSize, height: Self.knobSize)
                     .offset(x: width * progress - Self.knobSize / 2)
                     .transition(.scale(scale: 0.4).combined(with: .opacity))
                 }

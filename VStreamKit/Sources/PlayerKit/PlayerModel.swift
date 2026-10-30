@@ -16,7 +16,7 @@ public struct MediaTrack: Identifiable, Hashable, Sendable {
 
     public var displayName: String {
         var parts: [String] = []
-        if let language { parts.append(Locale.current.localizedString(forLanguageCode: language) ?? language) }
+        if let language { parts.append(Languages.name(for: language)) }
         if let title, !title.isEmpty, title != language { parts.append(title) }
         if let codec { parts.append(codec.uppercased()) }
         if let channels, channels > 0 { parts.append(channels == 6 ? "5.1" : channels == 8 ? "7.1" : "\(channels)ch") }
@@ -325,9 +325,12 @@ public final class PlayerModel {
         }
     }
 
+    /// Addon subtitles arrive as unselected tracks; pick the first one in the preferred language
+    /// unless mpv already selected an embedded match via `slang`.
     private func selectPreferredSubtitle() {
-        guard selectedSubtitleID == nil, let current, let preferred = current.preferredSubtitleLanguages.first,
-              let subtitle = current.subtitles.first(where: { $0.language == preferred }) else { return }
+        guard selectedSubtitleID == nil, let current, !current.preferredSubtitleLanguages.isEmpty,
+              let subtitle = current.subtitles.first(where: { Languages.matches($0.language, any: current.preferredSubtitleLanguages) })
+        else { return }
         addSubtitle(subtitle, select: true)
     }
 
