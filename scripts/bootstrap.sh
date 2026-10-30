@@ -11,10 +11,19 @@ engine_root="${VSTREAM_ENGINE_ROOT:-${parent_root}/nuvio-engine}"
 engine_framework="${engine_root}/platform/apple/NuvioEngine.xcframework"
 mpvkit_root="${VSTREAM_MPVKIT_ROOT:-${parent_root}/MPVKit}"
 
+# Dependencies are pinned to reviewed commits so a later push upstream can't change what gets built.
 clone_if_missing() {
-    local path="$1" url="$2" branch="${3:-}"
+    local path="$1" url="$2" commit="$3"
     if [[ ! -d "${path}/.git" ]]; then
-        git clone --depth 1 ${branch:+--branch "${branch}"} "${url}" "${path}"
+        git init --quiet "${path}"
+        git -C "${path}" remote add origin "${url}"
+        git -C "${path}" fetch --quiet --depth 1 origin "${commit}"
+        git -C "${path}" checkout --quiet --detach FETCH_HEAD
+    fi
+    local actual
+    actual="$(git -C "${path}" rev-parse HEAD)"
+    if [[ "${actual}" != "${commit}" ]]; then
+        echo "warning: ${path} is at ${actual}, expected ${commit}" >&2
     fi
 }
 
@@ -22,8 +31,8 @@ clone_if_missing() {
 # reads it when a file starts, so the picture stayed at the old size after resizing or entering
 # full screen.
 
-clone_if_missing "${mpvkit_root}" https://github.com/NuvioMedia/MPVKit.git Nuvio
-clone_if_missing "${engine_root}" https://github.com/NuvioMedia/nuvio-engine.git
+clone_if_missing "${mpvkit_root}" https://github.com/NuvioMedia/MPVKit.git bfeb6fcfa2bd5081a9666ae5bb42b50e6c1537e8  # branch Nuvio
+clone_if_missing "${engine_root}" https://github.com/NuvioMedia/nuvio-engine.git 167f8541d2e07212a9cf7034b9ca4a0c3b6be4d3  # v0.1.6
 
 if [[ ! -f "${engine_framework}/macos-arm64_x86_64/libCNuvioEngine.a" ]]; then
     temporary_directory="$(mktemp -d "${TMPDIR:-/tmp}/vstream-bootstrap.XXXXXX")"
