@@ -399,12 +399,15 @@ private struct Timeline: View {
             let progress = min(max((scrubbing ?? player.position) / duration, 0), 1)
             let buffered = min(max(player.cachedUntil / duration, 0), 1)
             let height: CGFloat = scrubbing != nil || isHovering ? 10 : 6
+            // Fills are flat-ended rectangles clipped by the rounded track, so the played part
+            // runs straight into the knob instead of ending in its own rounded cap.
             ZStack(alignment: .leading) {
-                Capsule().fill(.white.opacity(0.22))
-                Capsule().fill(.white.opacity(0.18)).frame(width: width * buffered)
-                Capsule().fill(.white).frame(width: max(width * progress, height))
+                Rectangle().fill(.white.opacity(0.22))
+                Rectangle().fill(.white.opacity(0.18)).frame(width: width * buffered)
+                Rectangle().fill(.white).frame(width: width * progress)
             }
             .frame(height: height)
+            .clipShape(.capsule)
             .overlay(alignment: .leading) {
                 if let scrubbing {
                     ZStack {

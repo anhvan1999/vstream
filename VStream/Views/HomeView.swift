@@ -1,10 +1,11 @@
 import AddonKit
+import Nuke
 import SwiftUI
 import VStreamCore
 
 struct HomeView: View {
     @Environment(AppModel.self) private var app
-    @State private var hero: MetaPreview?
+    @State private var featured: [MetaPreview] = []
 
     private var rows: [CatalogRow] {
         ContentService.homeRows(app.addons.enabled, includeAdult: app.settings.settings.showAdultCatalogs)
@@ -14,16 +15,16 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 30) {
-                if let hero {
-                    HeroBanner(meta: hero)
+                if !featured.isEmpty {
+                    HeroCarousel(items: featured)
                 } else {
                     ScreenHeader(title: "Home")
                 }
                 ContinueWatchingShelf()
                 ForEach(rows) { row in
                     CatalogShelf(row: row) { metas in
-                        if hero == nil, let first = metas.first(where: { $0.background != nil }) {
-                            hero = first
+                        if featured.isEmpty {
+                            featured = Array(metas.filter { $0.background != nil }.prefix(8))
                         }
                     }
                 }
@@ -35,8 +36,78 @@ struct HomeView: View {
             .padding(.bottom, 40)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
-        .ignoresSafeArea(edges: hero == nil ? [] : .top)
+        .ignoresSafeArea(edges: featured.isEmpty ? [] : .top)
         .navigationTitle("Home")
+    }
+}
+
+/// Featured titles that rotate every 8 seconds (paused while hovered), with glass arrows and
+/// page dots.
+struct HeroCarousel: View {
+    var items: [MetaPreview]
+    @State private var index = 0
+    @State private var isHovering = false
+    private let prefetcher = ImagePrefetcher()
+
+    var body: some View {
+        ZStack {
+            HeroBanner(meta: items[index])
+                .id(items[index].id)
+                .transition(.opacity)
+        }
+        .animation(.easeInOut(duration: 0.6), value: index)
+        .overlay {
+            if isHovering && items.count > 1 {
+                HStack {
+                    arrow("chevron.left") { step(-1) }
+                    Spacer()
+                    arrow("chevron.right") { step(1) }
+                }
+                .padding(.horizontal, 20)
+                .transition(.opacity)
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if items.count > 1 {
+                HStack(spacing: 7) {
+                    ForEach(items.indices, id: \.self) { position in
+                        Capsule()
+                            .fill(.white.opacity(position == index ? 0.95 : 0.4))
+                            .frame(width: position == index ? 20 : 7, height: 7)
+                            .contentShape(.rect)
+                            .onTapGesture { index = position }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .glassEffect(.regular, in: .capsule)
+                .padding(.trailing, 36)
+                .padding(.bottom, 40)
+                .animation(.spring(duration: 0.35), value: index)
+            }
+        }
+        .onHover { isHovering = $0 }
+        .animation(.easeOut(duration: 0.2), value: isHovering)
+        .task(id: items.map(\.id)) {
+            prefetcher.startPrefetching(with: items.compactMap(\.background) + items.compactMap(\.logo))
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(8))
+                if !isHovering, !Task.isCancelled { step(1) }
+            }
+        }
+        .environment(\.colorScheme, .dark)
+    }
+
+    private func step(_ delta: Int) {
+        index = (index + delta + items.count) % items.count
+    }
+
+    private func arrow(_ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.title2.weight(.semibold)).frame(width: 44, height: 44)
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
     }
 }
 
