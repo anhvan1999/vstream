@@ -78,7 +78,7 @@ struct DetailView: View {
                 .clipped()
                 .backgroundExtensionEffect()
                 .overlay {
-                    LinearGradient(colors: [.clear, .black.opacity(0.4), .black.opacity(0.92)], startPoint: .top, endPoint: .bottom)
+                    LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.45), location: 0.55), .init(color: Color(nsColor: .windowBackgroundColor), location: 1)], startPoint: .top, endPoint: .bottom)
                 }
 
             VStack(alignment: .leading, spacing: 14) {

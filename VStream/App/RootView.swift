@@ -9,7 +9,7 @@ struct RootView: View {
         NavigationSplitView {
             List(selection: $app.selection) {
                 Section {
-                    ForEach([SidebarItem.home, .discover, .library]) { item in
+                    ForEach([SidebarItem.home, .search, .discover, .library]) { item in
                         Label(item.title, systemImage: item.symbol).tag(item)
                     }
                 }
@@ -26,18 +26,15 @@ struct RootView: View {
                         DetailView(route: route)
                     }
             }
-            .toolbar(.hidden, for: .windowToolbar)
             .overlay(alignment: .topLeading) {
                 if !app.path.isEmpty { BackButton() }
             }
         }
         .toolbar(removing: .sidebarToggle)
-        .toolbar(.hidden, for: .windowToolbar)
-        .searchable(text: $app.searchText, placement: .sidebar, prompt: "Movies, shows, channels")
-        .onSubmit(of: .search) {
-            app.path = []
-            app.selection = .search
-        }
+        // The toolbar is invisible except on Search, where it hosts the search field and picks up
+        // glass once results scroll beneath it. (Hiding it outright also removes the traffic lights.)
+        .toolbarBackgroundVisibility(showsToolbar ? .automatic : .hidden, for: .windowToolbar)
+        .toolbar(removing: .title)
         .onChange(of: app.selection) { app.path = [] }
         #if DEBUG
         .task { debugAutoplay() }
@@ -59,10 +56,12 @@ struct RootView: View {
         } else {
             stream = AddonStream(url: url)
         }
-        app.play(meta: MetaDetail(preview: MetaPreview(id: "debug", type: "movie", name: "Debug playback")), video: nil, stream: stream)
+        app.play(meta: MetaDetail(preview: MetaPreview(id: "debug", type: "movie", name: "Debug playback")), video: nil, stream: stream, recordsProgress: false)
         openWindow(id: "player")
     }
     #endif
+
+    private var showsToolbar: Bool { app.selection == .search && app.path.isEmpty }
 
     @ViewBuilder private var content: some View {
         switch app.selection {

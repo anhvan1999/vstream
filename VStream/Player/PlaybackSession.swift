@@ -36,8 +36,11 @@ final class PlaybackSession: Identifiable {
     @ObservationIgnored private var wasPlaying = false
     @ObservationIgnored private var nextUpDismissed = false
 
-    init(app: AppModel, meta: MetaDetail, video: Video?, stream: AddonStream) {
+    @ObservationIgnored private let recordsProgress: Bool
+
+    init(app: AppModel, meta: MetaDetail, video: Video?, stream: AddonStream, recordsProgress: Bool = true) {
         self.app = app
+        self.recordsProgress = recordsProgress
         self.meta = meta
         self.video = video
         self.stream = stream
@@ -138,7 +141,9 @@ final class PlaybackSession: Identifiable {
         nowPlaying.update()
 
         if playing != wasPlaying, player.duration > 0 {
-            app.trakt.scrobble(playing ? .start : .pause, type: meta.type, videoID: videoID, progress: player.progress)
+            if recordsProgress {
+                app.trakt.scrobble(playing ? .start : .pause, type: meta.type, videoID: videoID, progress: player.progress)
+            }
             if !playing { record(force: true) }
             wasPlaying = playing
         }
@@ -151,7 +156,7 @@ final class PlaybackSession: Identifiable {
     }
 
     private func record(force: Bool) {
-        guard let app, player.duration > 0, force || player.isPlaying else { return }
+        guard recordsProgress, let app, player.duration > 0, force || player.isPlaying else { return }
         lastRecordedAt = Date()
         app.library.recordProgress(
             meta: meta.preview,
@@ -202,7 +207,7 @@ final class PlaybackSession: Identifiable {
 
     func close() {
         record(force: true)
-        if let app, player.duration > 0 {
+        if recordsProgress, let app, player.duration > 0 {
             app.trakt.scrobble(.stop, type: meta.type, videoID: videoID, progress: player.progress)
         }
         tasks.forEach { $0.cancel() }

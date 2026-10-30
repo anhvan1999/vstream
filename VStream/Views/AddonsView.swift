@@ -11,6 +11,21 @@ struct AddonsView: View {
     var body: some View {
         @Bindable var app = app
         List {
+            ScreenHeader(title: "Addons", subtitle: "\(app.addons.addons.count) installed") {
+                Button("Browse Community Addons", systemImage: "globe") {
+                    openURL(URL(string: "https://stremio-addons.com")!)
+                }
+                .buttonStyle(.glass)
+                Button("Refresh", systemImage: "arrow.clockwise") {
+                    Task { await app.addons.refreshManifests() }
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.glass)
+                .disabled(app.addons.isRefreshing)
+            }
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+
             Section {
                 HStack(spacing: 10) {
                     Image(systemName: "link").foregroundStyle(.secondary)
@@ -43,22 +58,7 @@ struct AddonsView: View {
             }
         }
         .listStyle(.inset)
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .navigationTitle("Addons")
-        .safeAreaInset(edge: .top, spacing: 0) {
-            ScreenHeader(title: "Addons", subtitle: "\(app.addons.addons.count) installed") {
-                Button("Browse Community Addons", systemImage: "globe") {
-                    openURL(URL(string: "https://stremio-addons.com")!)
-                }
-                .buttonStyle(.glass)
-                Button("Refresh", systemImage: "arrow.clockwise") {
-                    Task { await app.addons.refreshManifests() }
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.glass)
-                .disabled(app.addons.isRefreshing)
-            }
-        }
         .onAppear(perform: consumePendingURL)
         .onChange(of: app.pendingAddonURL) { consumePendingURL() }
     }

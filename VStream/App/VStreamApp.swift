@@ -24,6 +24,11 @@ struct VStreamApp: App {
         .commands {
             SidebarCommands()
             CommandGroup(before: .sidebar) {
+                Button("Search") {
+                    app.path = []
+                    app.selection = .search
+                }
+                .keyboardShortcut("f", modifiers: .command)
                 Button("Refresh Addons") { Task { await app.addons.refreshManifests() } }
                     .keyboardShortcut("r", modifiers: .command)
             }

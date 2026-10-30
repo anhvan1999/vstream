@@ -17,35 +17,12 @@ struct DiscoverView: View {
     var body: some View {
         Group {
             if let row = selectedRow {
-                CatalogGridView(row: row, genre: genre, showsHeader: false)
+                CatalogGridView(row: row, genre: genre, header: AnyView(header))
                     .id("\(row.id)|\(genre ?? "")")
             } else {
-                EmptyStateView(title: "Nothing to discover", symbol: "safari", message: "Your addons don't provide browsable catalogs.")
-            }
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            ScreenHeader(title: "Discover") {
-                Picker("Type", selection: $type) {
-                    ForEach(types, id: \.self) { Text($0.capitalized).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .fixedSize()
-
-                Picker("Catalog", selection: Binding(get: { selectedRow?.id }, set: { rowID = $0; genre = nil })) {
-                    ForEach(rowsForType) { row in
-                        Text("\(row.catalog.name) — \(row.addon.manifest.name)").tag(Optional(row.id))
-                    }
-                }
-                .fixedSize()
-
-                if let genres = selectedRow?.catalog.genres, !genres.isEmpty {
-                    Picker("Genre", selection: $genre) {
-                        if selectedRow?.catalog.extra(named: "genre")?.isRequired != true {
-                            Text("All genres").tag(String?.none)
-                        }
-                        ForEach(genres, id: \.self) { Text($0).tag(Optional($0)) }
-                    }
-                    .fixedSize()
+                VStack {
+                    header
+                    EmptyStateView(title: "Nothing to discover", symbol: "safari", message: "Your addons don't provide browsable catalogs.")
                 }
             }
         }
@@ -60,6 +37,33 @@ struct DiscoverView: View {
         }
     }
 
+    private var header: some View {
+        ScreenHeader(title: "Discover") {
+            Picker("Type", selection: $type) {
+                ForEach(types, id: \.self) { Text($0.capitalized).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .fixedSize()
+
+            Picker("Catalog", selection: Binding(get: { selectedRow?.id }, set: { rowID = $0; genre = nil })) {
+                ForEach(rowsForType) { row in
+                    Text("\(row.catalog.name) — \(row.addon.manifest.name)").tag(Optional(row.id))
+                }
+            }
+            .fixedSize()
+
+            if let genres = selectedRow?.catalog.genres, !genres.isEmpty {
+                Picker("Genre", selection: $genre) {
+                    if selectedRow?.catalog.extra(named: "genre")?.isRequired != true {
+                        Text("All genres").tag(String?.none)
+                    }
+                    ForEach(genres, id: \.self) { Text($0).tag(Optional($0)) }
+                }
+                .fixedSize()
+            }
+        }
+    }
+
     private func order(_ type: String) -> Int {
         ["movie", "series", "anime", "channel", "tv"].firstIndex(of: type) ?? 99
     }
@@ -70,8 +74,10 @@ struct SearchView: View {
     var query: String
     @State private var results: [SearchResultGroup] = []
     @State private var isSearching = false
+    @FocusState private var fieldFocused: Bool
 
     var body: some View {
+        @Bindable var app = app
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 28) {
                 ForEach(results) { group in
@@ -89,10 +95,12 @@ struct SearchView: View {
             }
             .padding(.vertical, 20)
         }
+        // The toolbar stays clear until content scrolls beneath it, then picks up its glass.
         .scrollEdgeEffectStyle(.soft, for: .top)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            ScreenHeader(title: query.isEmpty ? "Search" : "Results for “\(query)”")
-        }
+        .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
+        .searchable(text: $app.searchText, placement: .toolbar, prompt: "Movies, shows, channels")
+        .searchFocused($fieldFocused)
+        .onAppear { fieldFocused = true }
         .overlay {
             if isSearching && results.isEmpty {
                 ProgressView("Searching…")
@@ -100,11 +108,11 @@ struct SearchView: View {
                 EmptyStateView(
                     title: query.isEmpty ? "Search" : "No results",
                     symbol: "magnifyingglass",
-                    message: query.isEmpty ? "Type in the sidebar search field." : "No addon found anything for “\(query)”."
+                    message: query.isEmpty ? "Type a title in the search field above." : "No addon found anything for “\(query)”."
                 )
             }
         }
-        .navigationTitle(query.isEmpty ? "Search" : "“\(query)”")
+        .navigationTitle("Search")
         .task(id: query) {
             let trimmed = query.trimmingCharacters(in: .whitespaces)
             guard trimmed.count >= 2 else { results = []; return }
@@ -136,6 +144,19 @@ struct LibraryView: View {
 
     var body: some View {
         ScrollView {
+            ScreenHeader(title: "Library", subtitle: "\(items.count) items") {
+                Picker("Type", selection: $filter) {
+                    Text("All").tag("all")
+                    Text("Movies").tag("movie")
+                    Text("Series").tag("series")
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+                Picker("Sort", selection: $sort) {
+                    ForEach(Sort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                }
+                .fixedSize()
+            }
             PosterGrid(items: items) { item in
                 Button {
                     app.path.append(MetaRoute(type: item.type, id: item.id, preview: nil))
@@ -156,23 +177,7 @@ struct LibraryView: View {
                 EmptyStateView(title: "Your library is empty", symbol: "books.vertical", message: "Add movies and shows from their detail page.")
             }
         }
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .navigationTitle("Library")
-        .safeAreaInset(edge: .top, spacing: 0) {
-            ScreenHeader(title: "Library", subtitle: "\(items.count) items") {
-                Picker("Type", selection: $filter) {
-                    Text("All").tag("all")
-                    Text("Movies").tag("movie")
-                    Text("Series").tag("series")
-                }
-                .pickerStyle(.segmented)
-                .fixedSize()
-                Picker("Sort", selection: $sort) {
-                    ForEach(Sort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                }
-                .fixedSize()
-            }
-        }
     }
 
     /// Cinemeta's image CDN works for any IMDb id, which covers items imported without artwork.

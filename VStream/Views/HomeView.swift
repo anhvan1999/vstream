@@ -52,7 +52,7 @@ struct HeroBanner: View {
                 .clipped()
                 .backgroundExtensionEffect()
                 .overlay {
-                    LinearGradient(colors: [.clear, .black.opacity(0.25), .black.opacity(0.85)], startPoint: .top, endPoint: .bottom)
+                    LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.35), location: 0.55), .init(color: Color(nsColor: .windowBackgroundColor), location: 1)], startPoint: .top, endPoint: .bottom)
                 }
 
             VStack(alignment: .leading, spacing: 12) {
@@ -195,7 +195,8 @@ struct CatalogGridView: View {
     @Environment(AppModel.self) private var app
     var row: CatalogRow
     var genre: String?
-    var showsHeader = true
+    /// Replaces the default title header (Discover passes its pickers here).
+    var header: AnyView?
 
     @State private var metas: [MetaPreview] = []
     @State private var seen = Set<String>()
@@ -206,6 +207,7 @@ struct CatalogGridView: View {
 
     var body: some View {
         ScrollView {
+            header ?? AnyView(ScreenHeader(title: row.catalog.name, subtitle: row.addon.manifest.name))
             PosterGrid(items: metas, minWidth: 150, onReachEnd: loadMore) { meta in
                 Button { app.open(meta) } label: {
                     PosterCard(title: meta.name, poster: meta.poster, shape: meta.posterShape, width: 150, subtitle: meta.releaseInfo)
@@ -213,12 +215,6 @@ struct CatalogGridView: View {
                 .buttonStyle(.plain)
             }
             if isLoading { ProgressView().padding() }
-        }
-        .scrollEdgeEffectStyle(.soft, for: .top)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if showsHeader {
-                ScreenHeader(title: row.catalog.name, subtitle: row.addon.manifest.name)
-            }
         }
         .navigationTitle(row.catalog.name)
         .task(id: "\(row.id)|\(genre ?? "")") {

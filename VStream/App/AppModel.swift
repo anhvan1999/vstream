@@ -74,9 +74,9 @@ final class AppModel {
         selection = .addons
     }
 
-    func play(meta: MetaDetail, video: Video?, stream: AddonStream) {
+    func play(meta: MetaDetail, video: Video?, stream: AddonStream, recordsProgress: Bool = true) {
         playback?.close()
-        playback = PlaybackSession(app: self, meta: meta, video: video, stream: stream)
+        playback = PlaybackSession(app: self, meta: meta, video: video, stream: stream, recordsProgress: recordsProgress)
     }
 
     func closePlayback() {

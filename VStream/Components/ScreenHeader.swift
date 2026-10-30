@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// In-content header that replaces the window toolbar: title on the left, controls on the right,
-/// floating on glass above scrolling content.
+/// In-content header that replaces the window toolbar: title on the left, controls on the right.
+/// It is the first item of the page's scroll content, so it scrolls away instead of floating over posters.
 struct ScreenHeader<Controls: View>: View {
     @Environment(AppModel.self) private var app
     var title: String
