@@ -46,6 +46,20 @@ if [[ ! -f "${engine_framework}/macos-arm64_x86_64/libCNuvioEngine.a" ]]; then
     ditto "${source_framework}" "${engine_framework}"
 fi
 
+# Sign with the first Xcode team (Xcode → Settings → Accounts) so the Keychain keeps trusting
+# the app across rebuilds. Ad-hoc signatures change every build.
+local_config="${repository_root}/Config/Local.xcconfig"
+if [[ ! -f "${local_config}" ]]; then
+    team_id="$(defaults read com.apple.dt.Xcode IDEProvisioningTeamByIdentifier 2>/dev/null \
+        | sed -nE 's/.*teamID = "?([A-Z0-9]{10})"?;.*/\1/p' | head -1)"
+    if [[ -n "${team_id}" ]]; then
+        printf 'DEVELOPMENT_TEAM = %s\nCODE_SIGN_IDENTITY = Apple Development\n' "${team_id}" > "${local_config}"
+        echo "Signing with team ${team_id} (Config/Local.xcconfig)"
+    else
+        echo "No Xcode team found; building ad-hoc (Keychain will prompt after each rebuild)." >&2
+    fi
+fi
+
 if ! command -v xcodegen >/dev/null; then
     echo "xcodegen is required: brew install xcodegen" >&2
     exit 1

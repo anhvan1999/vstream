@@ -1,0 +1,8 @@
+// Code signing. Defaults to ad-hoc so anyone can build; a stable identity is needed for the
+// Keychain to keep trusting the app across rebuilds. `scripts/bootstrap.sh` writes
+// Config/Local.xcconfig (git-ignored) with your Xcode team when one is signed in.
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"

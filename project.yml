@@ -20,6 +20,9 @@ targets:
   VStream:
     type: application
     platform: macOS
+    configFiles:
+      Debug: Config/Signing.xcconfig
+      Release: Config/Signing.xcconfig
     sources:
       - path: VStream
     dependencies:
@@ -52,8 +55,6 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.vstream.app
         PRODUCT_NAME: VStream
-        CODE_SIGN_STYLE: Automatic
-        CODE_SIGN_IDENTITY: "-"
         ENABLE_HARDENED_RUNTIME: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor

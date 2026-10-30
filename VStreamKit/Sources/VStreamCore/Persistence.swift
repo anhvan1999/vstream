@@ -30,7 +30,10 @@ public enum JSONStore {
 
 /// Generic-password Keychain items for secrets (auth keys, API tokens).
 public enum Keychain {
-    private static let service = "com.vstream.app"
+    /// Items are owned by the signing identity that created them. Builds signed ad-hoc used
+    /// "com.vstream.app"; a fresh service name keeps a stably signed app from inheriting
+    /// those items, whose access lists would prompt on every read.
+    private static let service = "com.vstream.app.secrets"
 
     public static func string(_ account: String) -> String? {
         data(account).flatMap { String(data: $0, encoding: .utf8) }
