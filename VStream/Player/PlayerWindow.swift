@@ -32,6 +32,7 @@ private struct PlayerScreen: View {
 
     @State private var controlsVisible = true
     @State private var isFullScreen = false
+    @State private var isScrubbing = false
     @State private var hideTask: Task<Void, Never>?
     @FocusState private var focused: Bool
 
@@ -92,9 +93,11 @@ private struct PlayerScreen: View {
             return .handled
         }
         .navigationTitle(session.title)
-        // Only the player window may enter full screen, so these notifications are about it.
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in isFullScreen = true }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in isFullScreen = false }
+        // Read from the window itself: this view is recreated per session, possibly while the
+        // window is already full screen.
+        .onFullScreenChange { isFullScreen = $0 }
+        // Dragging produces no hover events; keep the controls up while scrubbing.
+        .onChange(of: isScrubbing) { revealControls() }
     }
 
     // MARK: Overlays
@@ -199,7 +202,7 @@ private struct PlayerScreen: View {
 
     private var bottomBar: some View {
         VStack(spacing: 14) {
-            Timeline(player: player)
+            Timeline(player: player, isScrubbing: $isScrubbing)
 
             ZStack {
                 // Transport, centred.
@@ -337,7 +340,7 @@ private struct PlayerScreen: View {
         hideTask?.cancel()
         hideTask = Task {
             try? await Task.sleep(for: .seconds(3))
-            guard !Task.isCancelled, player.isPlaying else { return }
+            guard !Task.isCancelled, player.isPlaying, !isScrubbing else { return }
             controlsVisible = false
             NSCursor.setHiddenUntilMouseMoves(true)
         }
@@ -364,27 +367,30 @@ private struct PlayerScreen: View {
     }
 }
 
-/// Minimal scrubber in the QuickTime style: a thin bar between the elapsed and remaining times.
-/// Hovering thickens the bar slightly and the elapsed label previews the hovered time; the knob
-/// appears only while dragging.
+/// Scrubber in the style of the Apple TV app's Liquid Glass player: a rounded bar with the elapsed
+/// and remaining times underneath. Hovering thickens the bar; dragging shows a large knob and a
+/// glass time bubble above it.
 private struct Timeline: View {
     let player: PlayerModel
+    @Binding var isScrubbing: Bool
     @State private var scrubbing: Double?
-    @State private var hover: Double?
+    @State private var isHovering = false
+
+    private static let knobSize: CGFloat = 22
 
     var body: some View {
         let duration = max(player.duration, 0.001)
-        let shown = scrubbing ?? hover.map { $0 * duration } ?? player.position
-        HStack(spacing: 12) {
-            Text(Self.format(shown))
-                .frame(minWidth: 44, alignment: .trailing)
-                .foregroundStyle(hover != nil || scrubbing != nil ? .white : .white.opacity(0.85))
+        let current = scrubbing ?? player.position
+        VStack(spacing: 6) {
             bar(duration: duration)
-            Text("−" + Self.format(max(player.duration - (scrubbing ?? player.position), 0)))
-                .frame(minWidth: 52, alignment: .leading)
-                .foregroundStyle(.white.opacity(0.85))
+            HStack {
+                Text(Self.format(current))
+                Spacer()
+                Text("−" + Self.format(max(player.duration - current, 0)))
+            }
+            .font(.caption.monospacedDigit().weight(.medium))
+            .foregroundStyle(.white.opacity(0.8))
         }
-        .font(.callout.monospacedDigit())
     }
 
     private func bar(duration: Double) -> some View {
@@ -392,32 +398,51 @@ private struct Timeline: View {
             let width = geometry.size.width
             let progress = min(max((scrubbing ?? player.position) / duration, 0), 1)
             let buffered = min(max(player.cachedUntil / duration, 0), 1)
-            let active = hover != nil || scrubbing != nil
+            let height: CGFloat = scrubbing != nil || isHovering ? 10 : 6
             ZStack(alignment: .leading) {
-                Capsule().fill(.white.opacity(0.25))
-                Capsule().fill(.white.opacity(0.2)).frame(width: width * buffered)
-                Capsule().fill(.white).frame(width: width * progress)
-                if scrubbing != nil {
-                    Circle().fill(.white).frame(width: 12, height: 12).offset(x: width * progress - 6)
+                Capsule().fill(.white.opacity(0.22))
+                Capsule().fill(.white.opacity(0.18)).frame(width: width * buffered)
+                Capsule().fill(.white).frame(width: max(width * progress, height))
+            }
+            .frame(height: height)
+            .overlay(alignment: .leading) {
+                if let scrubbing {
+                    ZStack {
+                        Circle()
+                            .fill(.white)
+                            .frame(width: Self.knobSize, height: Self.knobSize)
+                            .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
+                        Text(Self.format(scrubbing))
+                            .font(.callout.monospacedDigit().weight(.semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .glassEffect(.regular, in: .capsule)
+                            .fixedSize()
+                            .offset(y: -40)
+                    }
+                    .offset(x: width * progress - Self.knobSize / 2)
+                    .transition(.scale(scale: 0.4).combined(with: .opacity))
                 }
             }
-            .frame(height: active ? 6 : 4)
             .frame(maxHeight: .infinity)
             .contentShape(.rect)
             .gesture(
                 DragGesture(minimumDistance: 0)
-                    .onChanged { value in scrubbing = min(max(value.location.x / width, 0), 1) * duration }
+                    .onChanged { value in
+                        scrubbing = min(max(value.location.x / width, 0), 1) * duration
+                        if !isScrubbing { isScrubbing = true }
+                    }
                     .onEnded { _ in
                         if let scrubbing { player.seek(to: scrubbing) }
                         scrubbing = nil
+                        isScrubbing = false
                     }
             )
-            .onContinuousHover { phase in
-                if case let .active(location) = phase { hover = min(max(location.x / width, 0), 1) } else { hover = nil }
-            }
-            .animation(.easeOut(duration: 0.12), value: active)
+            .onHover { isHovering = $0 }
+            .animation(.spring(duration: 0.25, bounce: 0.3), value: scrubbing != nil)
+            .animation(.easeOut(duration: 0.15), value: isHovering)
         }
-        .frame(height: 18)
+        .frame(height: Self.knobSize)
     }
 
     static func format(_ seconds: Double) -> String {
