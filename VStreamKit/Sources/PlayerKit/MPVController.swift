@@ -1,4 +1,4 @@
-import AppKit
+import QuartzCore
 import Foundation
 import Libmpv
 
@@ -90,7 +90,7 @@ final class MPVController: @unchecked Sendable {
     init(onEvents: @escaping @Sendable ([MPVEvent]) -> Void) {
         self.onEvents = onEvents
         layer.framebufferOnly = true
-        layer.backgroundColor = NSColor.black.cgColor
+        layer.backgroundColor = CGColor(gray: 0, alpha: 1)
         layer.pixelFormat = .bgra8Unorm
     }
 

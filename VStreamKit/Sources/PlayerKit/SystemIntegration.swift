@@ -1,16 +1,24 @@
 import Foundation
-import IOKit.pwr_mgt
 import MediaPlayer
+#if os(macOS)
+import IOKit.pwr_mgt
+#else
+import AVFAudio
+import UIKit
+#endif
 
 /// Keeps the display awake while video plays.
 @MainActor
 public final class SleepAssertion {
+    #if os(macOS)
     private var assertionID: IOPMAssertionID = 0
+    #endif
     private var isHeld = false
 
     public init() {}
 
     public func hold(_ hold: Bool) {
+        #if os(macOS)
         if hold, !isHeld {
             isHeld = IOPMAssertionCreateWithName(
                 kIOPMAssertionTypeNoDisplaySleep as CFString,
@@ -22,10 +30,27 @@ public final class SleepAssertion {
             IOPMAssertionRelease(assertionID)
             isHeld = false
         }
+        #else
+        guard hold != isHeld else { return }
+        isHeld = hold
+        UIApplication.shared.isIdleTimerDisabled = hold
+        #endif
     }
 
     isolated deinit {
         hold(false)
+    }
+}
+
+/// iOS routes audio through the app's session; movie playback should ignore the silent switch
+/// and keep playing with the screen locked. No-op on macOS.
+public enum PlaybackAudioSession {
+    public static func activate() {
+        #if os(iOS)
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .moviePlayback, policy: .longFormVideo)
+        try? session.setActive(true)
+        #endif
     }
 }
 

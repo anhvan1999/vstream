@@ -59,6 +59,8 @@ final class AppModel {
     var homeFeatured: [MetaPreview] = []
     var isImportingTorrent = false
     var playLinkFocusRequest = 0
+    /// iPhone/iPad present Settings as a sheet (the Mac uses its Settings window).
+    var showsSettings = false
     var alert: AppAlert?
 
     init() {

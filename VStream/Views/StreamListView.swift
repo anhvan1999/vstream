@@ -196,7 +196,9 @@ struct StreamListView: View {
 
     private func play(_ stream: AddonStream) {
         app.play(meta: meta, video: video, stream: stream)
-        openWindow(id: "player")
+        #if os(macOS)
+        openWindow(id: "player")  // iPhone/iPad show the player as a cover when playback starts.
+        #endif
     }
 }
 

@@ -121,6 +121,21 @@ xcodebuild -project VStream.xcodeproj -scheme VStream -configuration Release \
 (cd VStreamKit && swift test)
 ```
 
+### iPhone and iPad
+The `VStream-iOS` target (iOS/iPadOS 26) shares the app's source; platform differences sit behind
+`#if os(macOS)` / `os(iOS)`. iPad keeps the sidebar, iPhone gets a tab bar (Addons are in Settings, opened
+with ⚙︎ on Library), and the player is a full-screen cover with touch controls (tap to show or hide them,
+double-tap the left or right half to seek 10 s).
+
+```bash
+xcodebuild -project VStream.xcodeproj -scheme VStream-iOS -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath build/iOSData -clonedSourcePackagesDirPath build/SourcePackages build
+```
+
+To run it on a device, open the project in Xcode, pick the `VStream-iOS` scheme and your iPhone or iPad,
+and let Xcode manage signing. A free Apple ID gives builds that expire after 7 days, a paid developer
+account one year. Torrents pause when the app is in the background; debrid and HTTP streams keep playing.
+
 ### Signing
 `Config/Signing.xcconfig` signs ad-hoc by default, so anyone can build. When Xcode is signed in to an Apple ID,
 `bootstrap.sh` writes the git-ignored `Config/Local.xcconfig` with your team, and the app is then signed with

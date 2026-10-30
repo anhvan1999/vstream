@@ -1,5 +1,4 @@
 import AddonKit
-import AppKit
 import SwiftUI
 
 /// Copy/open actions for a stream, like Stremio's "Copy stream link".
@@ -10,10 +9,7 @@ enum StreamLinks {
             ?? stream.ytId.map { "https://www.youtube.com/watch?v=\($0)" }
     }
 
-    static func copy(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-    }
+    static func copy(_ text: String) { Platform.copy(text) }
 }
 
 /// Menu items shared by the stream card's context menu and its "…" button.
@@ -36,7 +32,7 @@ struct StreamLinkMenuItems: View {
             }
         }
         if let url = stream.url {
-            Button("Open in Browser", systemImage: "safari") { NSWorkspace.shared.open(url) }
+            Button("Open in Browser", systemImage: "safari") { Platform.open(url) }
         }
     }
 }

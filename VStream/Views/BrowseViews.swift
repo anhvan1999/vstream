@@ -132,7 +132,9 @@ private struct ToolbarSearch: ViewModifier {
     func body(content: Content) -> some View {
         @Bindable var app = app
         content
+        #if os(macOS)
             .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
+        #endif
             .searchable(text: $app.searchText, placement: .toolbarPrincipal, prompt: "Movies, shows, channels")
             .searchFocused($focused)
             .onAppear { focused = true }
@@ -141,6 +143,9 @@ private struct ToolbarSearch: ViewModifier {
 
 struct LibraryView: View {
     @Environment(AppModel.self) private var app
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
     @State private var filter = "all"
     @State private var sort = Sort.recent
 
@@ -170,6 +175,14 @@ struct LibraryView: View {
                     ForEach(Sort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
                 .fixedSize()
+                #if os(iOS)
+                if horizontalSizeClass == .compact {
+                    // iPhone: no sidebar account badge, so Settings (and Addons) open here.
+                    Button("Settings", systemImage: "gearshape") { app.showsSettings = true }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.glass)
+                }
+                #endif
             }
             PosterGrid(items: items) { item in
                 Button {

@@ -276,8 +276,7 @@ struct PlayLinkView: View {
                     RecentRow(input: input) { open(link) }
                         .contextMenu {
                             Button("Copy Link", systemImage: "doc.on.doc") {
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(link, forType: .string)
+                                Platform.copy(link)
                             }
                             Button("Remove", systemImage: "xmark") { forget(link) }
                         }
@@ -385,7 +384,12 @@ struct PlayLinkView: View {
     private static func torrentData(_ url: URL, link: String) async throws -> Data {
         do {
             let data = if url.isFileURL {
-                try Data(contentsOf: url)
+                // Files from the iOS document picker / Files app are security-scoped.
+                try { () throws -> Data in
+                    let scoped = url.startAccessingSecurityScopedResource()
+                    defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                    return try Data(contentsOf: url)
+                }()
             } else {
                 try await URLSession.shared.data(from: url).0
             }
@@ -433,7 +437,9 @@ struct PlayLinkView: View {
     private func start(_ preview: MetaPreview, stream: AddonStream, torrentFile: Data?) {
         // Not tied to a catalog title, so nothing goes to Continue Watching or Trakt.
         app.play(meta: MetaDetail(preview: preview), video: nil, stream: stream, recordsProgress: false, torrentFile: torrentFile)
-        openWindow(id: "player")
+        #if os(macOS)
+        openWindow(id: "player")  // iPhone/iPad show the player as a cover when playback starts.
+        #endif
     }
 }
 

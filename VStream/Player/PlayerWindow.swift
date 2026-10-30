@@ -6,7 +6,6 @@ import VStreamCore
 
 struct PlayerWindow: View {
     @Environment(AppModel.self) private var app
-    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
         Group {
@@ -17,7 +16,12 @@ struct PlayerWindow: View {
                 EmptyStateView(title: "Nothing playing", symbol: "play.rectangle", message: "Pick a stream from a title's page.")
             }
         }
+        #if os(macOS)
         .frame(minWidth: 640, minHeight: 360)
+        #else
+        .statusBarHidden()
+        .persistentSystemOverlays(.hidden)
+        #endif
         .background(.black)
         // No toolbar here: leave the full-screen title bar to AppKit so its buttons stay usable.
         .fullScreenAllowed(true)
@@ -32,8 +36,10 @@ private struct PlayerScreen: View {
 
     @State private var controlsVisible = true
     @State private var isFullScreen = false
+    #if os(macOS)
     /// The player's own window; `NSApp.keyWindow` can be the full-screen title-bar window instead.
     @State private var hostWindow = WindowHandle()
+    #endif
     @State private var isScrubbing = false
     @State private var showsSubtitles = false
     @State private var hideTask: Task<Void, Never>?
@@ -46,9 +52,25 @@ private struct PlayerScreen: View {
     var body: some View {
         ZStack {
             Color.black
+                .ignoresSafeArea()
+            #if os(macOS)
             MPVVideoView(model: player)
                 .onTapGesture(count: 2) { toggleFullScreen() }
                 .onTapGesture { player.togglePause() }
+            #else
+            // Touch: tap shows/hides the controls; double-tap the left or right half to seek 10 s.
+            GeometryReader { geometry in
+                MPVVideoView(model: player)
+                    .onTapGesture(count: 2) { location in
+                        player.seek(by: location.x < geometry.size.width / 2 ? -10 : 10)
+                        revealControls()
+                    }
+                    .onTapGesture {
+                        if controlsVisible { controlsVisible = false } else { revealControls() }
+                    }
+            }
+            .ignoresSafeArea()
+            #endif
 
             if player.rendersSubtitlesInApp, !player.subtitleText.isEmpty {
                 SubtitleOverlay(
@@ -57,6 +79,7 @@ private struct PlayerScreen: View {
                     liftedBy: controlsVisible || !player.isPlaying ? 150 : 0
                 )
                 .animation(.easeInOut(duration: 0.2), value: controlsVisible)
+                .ignoresSafeArea()
             }
 
             statusOverlay
@@ -88,7 +111,11 @@ private struct PlayerScreen: View {
                     .padding(.bottom, 120)
             }
         }
+        // The Mac draws everything edge to edge; on iPhone/iPad the controls stay clear of the
+        // notch and home indicator while the picture fills the screen.
+        #if os(macOS)
         .ignoresSafeArea()
+        #endif
         .onContinuousHover { phase in
             if case .active = phase { revealControls() }
         }
@@ -133,6 +160,7 @@ private struct PlayerScreen: View {
             return .handled
         }
         .navigationTitle(session.title)
+        #if os(macOS)
         // Read from the window itself: this view is recreated per session, possibly while the
         // window is already full screen.
         .onFullScreenChange { fullScreen, window in
@@ -146,6 +174,7 @@ private struct PlayerScreen: View {
         .onChange(of: player.videoAspect) { _, aspect in
             if let aspect, !isFullScreen { fitWindow(to: aspect) }
         }
+        #endif
         // Dragging produces no hover events; keep the controls up while scrubbing.
         .onChange(of: isScrubbing) { revealControls() }
     }
@@ -160,7 +189,7 @@ private struct PlayerScreen: View {
             VStack(spacing: 14) {
                 Image(systemName: "exclamationmark.triangle.fill").font(.largeTitle).foregroundStyle(.yellow)
                 Text(message).multilineTextAlignment(.center).frame(maxWidth: 420)
-                Button("Close") { dismissWindow(id: "player") }.buttonStyle(.glass)
+                Button("Close") { closePlayer() }.buttonStyle(.glass)
             }
             .padding(28)
             .glassEffect(.regular, in: .rect(cornerRadius: 24))
@@ -212,7 +241,7 @@ private struct PlayerScreen: View {
     private var topBar: some View {
         HStack(spacing: 12) {
             Button {
-                dismissWindow(id: "player")
+                closePlayer()
             } label: {
                 Image(systemName: "chevron.backward").font(.body.weight(.semibold)).frame(width: 28, height: 28)
             }
@@ -232,7 +261,7 @@ private struct PlayerScreen: View {
             if let stats = session.torrentStats {
                 TorrentStatsChip(stats: stats)
             }
-            if isFullScreen {
+            if Self.supportsFullScreen, isFullScreen {
                 Button {
                     toggleFullScreen()
                 } label: {
@@ -246,7 +275,7 @@ private struct PlayerScreen: View {
                 SourceChip(source: source, hardwareDecoder: player.hardwareDecoder)
             }
         }
-        .padding(.top, isFullScreen ? 16 : 38)
+        .padding(.top, Self.supportsFullScreen ? (isFullScreen ? 16 : 38) : 8)
     }
 
     private var bottomBar: some View {
@@ -275,8 +304,10 @@ private struct PlayerScreen: View {
                         subtitleMenu
                         if player.audioTracks.count > 1 { audioMenu }
                         moreMenu
-                        toolButton(isFullScreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
-                                   help: isFullScreen ? "Exit full screen (Esc)" : "Full screen (F)") { toggleFullScreen() }
+                        if Self.supportsFullScreen {
+                            toolButton(isFullScreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                                       help: isFullScreen ? "Exit full screen (Esc)" : "Full screen (F)") { toggleFullScreen() }
+                        }
                     }
                     .padding(.horizontal, 6)
                     .padding(.vertical, 4)
@@ -392,10 +423,28 @@ private struct PlayerScreen: View {
             try? await Task.sleep(for: .seconds(3))
             guard !Task.isCancelled, player.isPlaying, !isScrubbing, !showsSubtitles else { return }
             controlsVisible = false
+            #if os(macOS)
             NSCursor.setHiddenUntilMouseMoves(true)
+            #endif
         }
     }
 
+    /// The Mac player is a window that can go full screen; iPhone/iPad always fill the screen.
+    #if os(macOS)
+    private static let supportsFullScreen = true
+    #else
+    private static let supportsFullScreen = false
+    #endif
+
+    private func closePlayer() {
+        #if os(macOS)
+        dismissWindow(id: "player")
+        #else
+        app.closePlayback()
+        #endif
+    }
+
+    #if os(macOS)
     /// Matches the window to the video so it opens without black bars, and keeps that ratio
     /// while resizing. The width stays; the height follows (clamped to the screen).
     private func fitWindow(to aspect: Double) {
@@ -428,6 +477,9 @@ private struct PlayerScreen: View {
         #endif
         window?.toggleFullScreen(nil)
     }
+    #else
+    private func toggleFullScreen() {}
+    #endif
 
     private func cycle(_ tracks: [MediaTrack], selected: Int?, allowOff: Bool, select: (Int?) -> Void) {
         var options: [Int?] = tracks.map(\.id)
@@ -630,9 +682,11 @@ private struct NextUpCard: View {
 }
 
 /// Weak reference to an AppKit window, held in SwiftUI state without triggering updates.
+#if os(macOS)
 final class WindowHandle {
     weak var window: NSWindow?
 }
+#endif
 
 /// Plain-text subtitles in the macOS caption style (System Settings → Accessibility → Captions),
 /// placed near the bottom of the picture like the Apple TV app.

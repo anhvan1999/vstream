@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import SwiftUI
 
@@ -120,3 +121,11 @@ extension View {
         background(FullScreenReader(onChange: action))
     }
 }
+#else
+import SwiftUI
+
+extension View {
+    /// Windows are always full screen on iPhone/iPad.
+    func fullScreenAllowed(_ allowed: Bool) -> some View { self }
+}
+#endif

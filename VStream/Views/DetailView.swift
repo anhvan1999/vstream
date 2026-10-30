@@ -90,7 +90,7 @@ struct DetailView: View {
                     stops: [
                         .init(color: .clear, location: 0),
                         .init(color: .black.opacity(0.25), location: 0.45),
-                        .init(color: Color(nsColor: .windowBackgroundColor).opacity(meta.isSeriesLike ? 0.92 : 0.8), location: 1),
+                        .init(color: Color.windowBackground.opacity(meta.isSeriesLike ? 0.92 : 0.8), location: 1),
                     ],
                     startPoint: .top,
                     endPoint: .bottom

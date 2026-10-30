@@ -54,6 +54,9 @@ struct HomeView: View {
 /// page dots.
 struct HeroCarousel: View {
     var items: [MetaPreview]
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
     @State private var index = 0
     @State private var isHovering = false
     private let prefetcher = ImagePrefetcher()
@@ -76,7 +79,7 @@ struct HeroCarousel: View {
                 .transition(.opacity)
             }
         }
-        .overlay(alignment: .bottomTrailing) {
+        .overlay(alignment: isCompact ? .bottom : .bottomTrailing) {
             if items.count > 1 {
                 HStack(spacing: 7) {
                     ForEach(items.indices, id: \.self) { position in
@@ -90,8 +93,9 @@ struct HeroCarousel: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .glassEffect(.regular, in: .capsule)
-                .padding(.trailing, 36)
-                .padding(.bottom, 40)
+                // iPhone: centred under the buttons, which span the narrow screen.
+                .padding(.trailing, isCompact ? 0 : 36)
+                .padding(.bottom, isCompact ? 6 : 40)
                 .animation(.spring(duration: 0.35), value: index)
             }
         }
@@ -105,6 +109,14 @@ struct HeroCarousel: View {
             }
         }
         .environment(\.colorScheme, .dark)
+    }
+
+    private var isCompact: Bool {
+        #if os(iOS)
+        horizontalSizeClass == .compact
+        #else
+        false
+        #endif
     }
 
     private func step(_ delta: Int) {
@@ -136,7 +148,7 @@ struct HeroBanner: View {
                 .clipped()
                 .backgroundExtensionEffect()
                 .overlay {
-                    LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.35), location: 0.55), .init(color: Color(nsColor: .windowBackgroundColor), location: 1)], startPoint: .top, endPoint: .bottom)
+                    LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.35), location: 0.55), .init(color: Color.windowBackground, location: 1)], startPoint: .top, endPoint: .bottom)
                 }
 
             VStack(alignment: .leading, spacing: 12) {

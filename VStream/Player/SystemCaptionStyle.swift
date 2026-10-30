@@ -1,11 +1,11 @@
-import AppKit
+import CoreText
 import MediaAccessibility
 import SwiftUI
 
 /// The user's caption style from System Settings → Accessibility → Captions, read through
 /// MediaAccessibility like the Apple TV app does.
 struct SystemCaptionStyle: Equatable {
-    var font: NSFont
+    var font: CTFont
     var relativeSize: CGFloat
     var textColor: Color
     /// Behind each line of text.
@@ -20,12 +20,11 @@ struct SystemCaptionStyle: Equatable {
     static func current() -> SystemCaptionStyle {
         let domain = MACaptionAppearanceDomain.user
         func color(_ copy: (MACaptionAppearanceDomain, UnsafeMutablePointer<MACaptionAppearanceBehavior>?) -> Unmanaged<CGColor>, opacity: CGFloat) -> Color {
-            let cgColor = copy(domain, nil).takeRetainedValue()
-            return Color(nsColor: NSColor(cgColor: cgColor) ?? .clear).opacity(opacity)
+            Color(cgColor: copy(domain, nil).takeRetainedValue()).opacity(opacity)
         }
         let descriptor = MACaptionAppearanceCopyFontDescriptorForStyle(domain, nil, .default).takeRetainedValue()
         return SystemCaptionStyle(
-            font: NSFont(descriptor: descriptor, size: 0) ?? .systemFont(ofSize: 0, weight: .medium),
+            font: CTFontCreateWithFontDescriptor(descriptor, 0, nil),
             relativeSize: MACaptionAppearanceGetRelativeCharacterSize(domain, nil),
             textColor: color(MACaptionAppearanceCopyForegroundColor, opacity: MACaptionAppearanceGetForegroundOpacity(domain, nil)),
             backgroundColor: color(MACaptionAppearanceCopyBackgroundColor, opacity: MACaptionAppearanceGetBackgroundOpacity(domain, nil)),
@@ -52,7 +51,7 @@ struct SystemCaptionText: View {
         VStack(spacing: size * 0.12) {
             ForEach(Array(text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()), id: \.offset) { _, line in
                 Text(String(line))
-                    .font(Font(style.font.withSize(size)))
+                    .font(Font(CTFontCreateCopyWithAttributes(style.font, size, nil, nil)))
                     .foregroundStyle(style.textColor)
                     .modifier(EdgeEffect(edge: style.edge, size: size))
                     .padding(.horizontal, size * 0.3)

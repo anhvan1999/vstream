@@ -5,7 +5,12 @@ import TorrentKit
 import VStreamCore
 
 struct SettingsView: View {
+    #if os(iOS)
+    @Environment(\.dismiss) private var dismiss
+    #endif
+
     var body: some View {
+        #if os(macOS)
         TabView {
             Tab("Accounts", systemImage: "person.crop.circle") { AccountsSettings() }
             Tab("Debrid", systemImage: "bolt") { DebridSettings() }
@@ -14,6 +19,33 @@ struct SettingsView: View {
         }
         .frame(width: 560, height: 480)
         .scenePadding()
+        #else
+        // A sheet on iPhone/iPad: one pushed page per Mac tab.
+        NavigationStack {
+            List {
+                // iPhone has no sidebar, so the addon manager lives here too.
+                NavigationLink { AddonsView() } label: {
+                    Label("Addons", systemImage: "puzzlepiece.extension")
+                }
+                NavigationLink { AccountsSettings().navigationTitle("Accounts") } label: {
+                    Label("Accounts", systemImage: "person.crop.circle")
+                }
+                NavigationLink { DebridSettings().navigationTitle("Debrid") } label: {
+                    Label("Debrid", systemImage: "bolt")
+                }
+                NavigationLink { PlaybackSettings().navigationTitle("Playback") } label: {
+                    Label("Playback", systemImage: "play.rectangle")
+                }
+                NavigationLink { TorrentSettingsView().navigationTitle("Torrent") } label: {
+                    Label("Torrent", systemImage: "point.3.connected.trianglepath.dotted")
+                }
+            }
+            .navigationTitle("Settings")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+        }
+        #endif
     }
 }
 
@@ -89,7 +121,7 @@ private struct AccountsSettings: View {
                         Spacer()
                         Button("Connect") {
                             app.trakt.connect { url in
-                                await MainActor.run { _ = NSWorkspace.shared.open(url) }
+                                await SignInBrowser.open(url)
                             }
                         }
                         .buttonStyle(.glassProminent)
@@ -102,6 +134,10 @@ private struct AccountsSettings: View {
             }
         }
         .formStyle(.grouped)
+        // Closes the in-app sign-in sheet on iPhone/iPad once Trakt redirected back.
+        .onChange(of: app.trakt.isWaitingForBrowser) { _, waiting in
+            if !waiting { SignInBrowser.finish() }
+        }
     }
 }
 
@@ -134,7 +170,11 @@ private struct DebridSettings: View {
                 Picker("Play torrents with", selection: $settings.settings.torrentMode) {
                     ForEach(TorrentMode.allCases) { Text($0.title).tag($0) }
                 }
+                #if os(macOS)
                 .pickerStyle(.radioGroup)
+                #else
+                .pickerStyle(.inline)
+                #endif
                 Toggle("Add uncached torrents to my debrid account", isOn: $settings.settings.addUncachedToDebrid)
                     .disabled(settings.settings.torrentMode == .peerToPeerOnly)
             } header: {

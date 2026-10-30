@@ -4,32 +4,14 @@ import SwiftUI
 struct RootView: View {
     @Environment(AppModel.self) private var app
 
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
+
     var body: some View {
         @Bindable var app = app
-        NavigationSplitView {
-            List(selection: $app.selection) {
-                Section {
-                    ForEach([SidebarItem.home, .search, .discover, .library, .playLink]) { item in
-                        Label(item.title, systemImage: item.symbol).tag(item)
-                    }
-                }
-                Section("Manage") {
-                    Label(SidebarItem.addons.title, systemImage: SidebarItem.addons.symbol).tag(SidebarItem.addons)
-                }
-            }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
-            .safeAreaInset(edge: .bottom) { AccountBadge().padding(10) }
-        } detail: {
-            NavigationStack(path: $app.path) {
-                content
-                    .navigationDestination(for: MetaRoute.self) { route in
-                        DetailView(route: route)
-                    }
-            }
-            .overlay(alignment: .topLeading) {
-                if !app.path.isEmpty { BackButton() }
-            }
-        }
+        layout
+        #if os(macOS)
         .toolbar(removing: .sidebarToggle)
         // The toolbar stays (it carries the traffic lights) but is invisible except on Search,
         // where it hosts the search field.
@@ -37,6 +19,15 @@ struct RootView: View {
         .toolbar(removing: .title)
         // Only the player goes full screen; the green button zooms this window instead.
         .fullScreenAllowed(false)
+        #else
+        // iPhone/iPad have no player window: playback covers the screen.
+        .fullScreenCover(item: Binding(get: { app.playback }, set: { if $0 == nil { app.closePlayback() } })) { _ in
+            PlayerWindow().environment(app)
+        }
+        .sheet(isPresented: $app.showsSettings) {
+            SettingsView().environment(app)
+        }
+        #endif
         .onChange(of: app.selection) { app.path = [] }
         // Torrents, magnets and video files dropped on any page open in Play Link (which has
         // its own drop target with a highlight).
@@ -75,15 +66,99 @@ struct RootView: View {
         // `VSTREAM_DEBUG_META=<type>:<id>` borrows a real title's addon subtitles.
         let parts = ProcessInfo.processInfo.environment["VSTREAM_DEBUG_META"]?.split(separator: ":", maxSplits: 1).map(String.init)
         let preview = MetaPreview(id: parts?.last ?? "debug", type: parts?.first ?? "movie", name: "Debug playback")
+        #if os(macOS)
         app.play(meta: MetaDetail(preview: preview), video: nil, stream: stream, recordsProgress: false)
         openWindow(id: "player")
+        #else
+        // Presenting the player cover before the first frame of the scene is dropped.
+        Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            app.play(meta: MetaDetail(preview: preview), video: nil, stream: stream, recordsProgress: false)
+        }
+        #endif
     }
     #endif
 
+    /// Sidebar on the Mac and iPad; a tab bar on iPhone, where the sidebar would collapse away.
+    @ViewBuilder private var layout: some View {
+        #if os(iOS)
+        if horizontalSizeClass == .compact {
+            tabLayout
+        } else {
+            splitLayout
+        }
+        #else
+        splitLayout
+        #endif
+    }
+
+    private var splitLayout: some View {
+        NavigationSplitView {
+            List(selection: sidebarSelection) {
+                Section {
+                    ForEach([SidebarItem.home, .search, .discover, .library, .playLink]) { item in
+                        Label(item.title, systemImage: item.symbol).tag(item)
+                    }
+                }
+                Section("Manage") {
+                    Label(SidebarItem.addons.title, systemImage: SidebarItem.addons.symbol).tag(SidebarItem.addons)
+                }
+            }
+            .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
+            .safeAreaInset(edge: .bottom) { AccountBadge().padding(10) }
+        } detail: {
+            detailStack(content)
+        }
+    }
+
+    #if os(iOS)
+    private var tabLayout: some View {
+        TabView(selection: sidebarSelection) {
+            // Four tabs plus Search fit the bar; Addons lives in Settings (⚙︎ on Library).
+            ForEach([SidebarItem.home, .discover, .library, .playLink]) { item in
+                Tab(item.title, systemImage: item.symbol, value: Optional(item)) {
+                    detailStack(content(for: item))
+                }
+            }
+            Tab(SidebarItem.search.title, systemImage: SidebarItem.search.symbol, value: Optional(SidebarItem.search), role: .search) {
+                detailStack(content(for: .search))
+            }
+        }
+    }
+    #endif
+
+    private func detailStack(_ page: some View) -> some View {
+        @Bindable var app = app
+        return NavigationStack(path: $app.path) {
+            page
+                #if os(iOS)
+                // Pages draw their own headers and back button, as on the Mac; the bar only
+                // shows on Search, where it hosts the search field.
+                .toolbar(showsToolbar ? .visible : .hidden, for: .navigationBar)
+                #endif
+                .navigationDestination(for: MetaRoute.self) { route in
+                    DetailView(route: route)
+                        #if os(iOS)
+                        .toolbar(.hidden, for: .navigationBar)
+                        #endif
+                }
+        }
+        .overlay(alignment: .topLeading) {
+            if !app.path.isEmpty { BackButton() }
+        }
+    }
+
+    /// Optional, as iOS lists require; deselection is ignored so a tab always stays selected.
+    private var sidebarSelection: Binding<SidebarItem?> {
+        Binding(get: { app.selection }, set: { if let item = $0 { app.selection = item } })
+    }
+
     private var showsToolbar: Bool { app.selection == .search && app.path.isEmpty }
 
-    @ViewBuilder private var content: some View {
-        switch app.selection {
+    private var content: some View { content(for: app.selection) }
+
+    @ViewBuilder private func content(for item: SidebarItem) -> some View {
+        switch item {
         case .home: HomeView()
         case .discover: DiscoverView()
         case .library: LibraryView()
@@ -109,7 +184,7 @@ private struct AccountBadge: View {
     }
 
     var body: some View {
-        SettingsLink {
+        settingsButton {
             HStack(spacing: 8) {
                 Image(systemName: app.stremio.isSignedIn ? "person.crop.circle.fill" : "person.crop.circle")
                     .font(.title3)
@@ -129,5 +204,15 @@ private struct AccountBadge: View {
         }
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
+    }
+
+    /// The Settings window on the Mac, a sheet on iPhone/iPad.
+    @ViewBuilder
+    private func settingsButton<Label: View>(@ViewBuilder label: () -> Label) -> some View {
+        #if os(macOS)
+        SettingsLink(label: label)
+        #else
+        Button(action: { app.showsSettings = true }, label: label)
+        #endif
     }
 }

@@ -12,6 +12,7 @@ struct VStreamApp: App {
     }
 
     var body: some Scene {
+        #if os(macOS)
         WindowGroup("VStream", id: "main") {
             RootView()
                 .environment(app)
@@ -59,5 +60,14 @@ struct VStreamApp: App {
             SettingsView()
                 .environment(app)
         }
+        #else
+        // iPhone/iPad: one scene; the player is a full-screen cover and Settings a sheet.
+        WindowGroup {
+            RootView()
+                .environment(app)
+                .task { await app.start() }
+                .onOpenURL { app.handle(url: $0) }
+        }
+        #endif
     }
 }

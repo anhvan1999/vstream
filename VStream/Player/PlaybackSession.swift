@@ -1,5 +1,4 @@
 import AddonKit
-import AppKit
 import Foundation
 import Observation
 import OSLog
@@ -76,6 +75,7 @@ final class PlaybackSession: Identifiable {
         hasURL=\(self.stream.url != nil, privacy: .public) host=\(self.stream.url?.host ?? "-", privacy: .public) \
         infoHash=\(self.stream.infoHash != nil, privacy: .public) fileIdx=\(self.stream.fileIdx ?? -1, privacy: .public)
         """)
+        PlaybackAudioSession.activate()
         let resolver = app.resolver
         let stream = self.stream
         let context = EpisodeContext(videoID: videoID)
@@ -102,7 +102,7 @@ final class PlaybackSession: Identifiable {
                 }
                 switch outcome {
                 case let .openExternally(url):
-                    NSWorkspace.shared.open(url)
+                    Platform.open(url)
                     self.stage = .failed("Opened in your browser")
                 case let .play(resolved):
                     Self.log.notice("resolved source=\(String(describing: resolved.source), privacy: .public) host=\(resolved.url.host ?? "-", privacy: .public)")

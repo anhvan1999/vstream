@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "VStreamKit",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v26), .iOS(.v26)],
     products: [
         .library(name: "AddonKit", targets: ["AddonKit"]),
         .library(name: "StremioAPI", targets: ["StremioAPI"]),

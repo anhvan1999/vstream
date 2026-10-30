@@ -24,6 +24,7 @@ struct AddonsView: View {
                 .labelStyle(.iconOnly)
                 .buttonStyle(.glass)
                 .disabled(app.addons.isRefreshing)
+
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -145,8 +146,7 @@ private struct AddonRow: View {
         .padding(.vertical, 6)
         .contextMenu {
             Button("Copy URL", systemImage: "doc.on.doc") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(addon.descriptor.transportUrl.absoluteString, forType: .string)
+                Platform.copy(addon.descriptor.transportUrl.absoluteString)
             }
             if !addon.descriptor.flags.protected {
                 Button("Uninstall", systemImage: "trash", role: .destructive) { app.addons.remove(addon) }

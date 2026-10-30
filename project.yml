@@ -3,12 +3,14 @@ options:
   bundleIdPrefix: com.vstream
   deploymentTarget:
     macOS: "26.0"
+    iOS: "26.0"
   createIntermediateGroups: true
   developmentLanguage: en
 settings:
   base:
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "26.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
     SWIFT_STRICT_CONCURRENCY: complete
 packages:
   VStreamKit:
@@ -66,6 +68,66 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         DEAD_CODE_STRIPPING: YES
         OTHER_LDFLAGS: ["-ObjC"]
+  VStream-iOS:
+    type: application
+    platform: iOS
+    configFiles:
+      Debug: Config/Signing.xcconfig
+      Release: Config/Signing.xcconfig
+    sources:
+      # Shared with the Mac app; platform-specific parts are behind #if os(macOS) / os(iOS).
+      - path: VStream
+        excludes:
+          - Info.plist
+          - VStream.entitlements
+    dependencies:
+      - package: VStreamKit
+        products: [AddonKit, StremioAPI, TraktKit, DebridKit, TorrentKit, PlayerKit, VStreamCore]
+      - package: Nuke
+        products: [Nuke, NukeUI]
+    info:
+      path: VStream-iOS/Info.plist
+      properties:
+        CFBundleDisplayName: VStream
+        CFBundleShortVersionString: "0.1.3"
+        CFBundleVersion: "5"
+        LSApplicationCategoryType: public.app-category.entertainment
+        NSHumanReadableCopyright: "GPL-3.0"
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen: {}
+        UIApplicationSupportsIndirectInputEvents: true
+        UIBackgroundModes: [audio]
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        LSSupportsOpeningDocumentsInPlace: false
+        CFBundleURLTypes:
+          - CFBundleURLName: Stremio addon
+            CFBundleURLSchemes: [stremio]
+          - CFBundleURLName: Magnet link
+            CFBundleURLSchemes: [magnet]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: BitTorrent File
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [org.bittorrent.torrent]
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: org.bittorrent.torrent
+            UTTypeDescription: BitTorrent File
+            UTTypeConformsTo: [public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: [torrent]
+              public.mime-type: [application/x-bittorrent]
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.vstream.app
+        PRODUCT_NAME: VStream
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        DEAD_CODE_STRIPPING: YES
+        OTHER_LDFLAGS: ["-ObjC"]
 schemes:
   VStream:
     build:
@@ -75,5 +137,13 @@ schemes:
       config: Debug
       enableGPUValidationMode: disabled
       enableGPUFrameCaptureMode: disabled
+    archive:
+      config: Release
+  VStream-iOS:
+    build:
+      targets:
+        VStream-iOS: all
+    run:
+      config: Debug
     archive:
       config: Release
