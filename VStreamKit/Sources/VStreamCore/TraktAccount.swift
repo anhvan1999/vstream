@@ -8,7 +8,7 @@ import TraktKit
 @Observable
 public final class TraktAccount {
     public private(set) var isConnected = false
-    public private(set) var pendingCode: TraktDeviceCode?
+    public private(set) var isWaitingForBrowser = false
     public private(set) var isSyncing = false
     public private(set) var lastError: String?
 
@@ -30,13 +30,13 @@ public final class TraktAccount {
     }
 
     public var hasCredentials: Bool {
-        !settings.settings.traktClientID.isEmpty && !settings.traktClientSecret.isEmpty
+        !settings.settings.traktClientID.isEmpty
     }
 
     private func makeClient() -> TraktClient? {
         guard hasCredentials else { return nil }
         if let client { return client }
-        let credentials = TraktCredentials(clientID: settings.settings.traktClientID, clientSecret: settings.traktClientSecret)
+        let credentials = TraktCredentials(clientID: settings.settings.traktClientID)
         let client = TraktClient(credentials: credentials, token: Keychain.value(TraktToken.self, for: "trakt.token")) { [weak self] token in
             Keychain.set(value: token, for: "trakt.token")
             Task { @MainActor in self?.isConnected = token != nil }
@@ -45,26 +45,24 @@ public final class TraktAccount {
         return client
     }
 
-    /// Starts device authorization; `pendingCode` is shown to the user until approved.
-    public func connect() {
+    /// Authorization code + PKCE (public client, no secret): opens the browser and captures
+    /// the redirect on `http://localhost:8765/trakt`.
+    public func connect(openURL: @escaping @Sendable (URL) async -> Void) {
         guard let client = makeClient() else {
-            lastError = "Add your Trakt client ID and secret first"
+            lastError = "Add your Trakt client ID first"
             return
         }
         authTask?.cancel()
+        lastError = nil
+        isWaitingForBrowser = true
         authTask = Task {
+            defer { isWaitingForBrowser = false }
             do {
-                let code = try await client.requestDeviceCode()
-                pendingCode = code
-                _ = try await client.pollForToken(code)
-                pendingCode = nil
+                _ = try await client.authorizeInBrowser(openURL: openURL)
                 isConnected = true
-                lastError = nil
                 await importHistory()
             } catch is CancellationError {
-                pendingCode = nil
             } catch {
-                pendingCode = nil
                 lastError = error.localizedDescription
             }
         }
@@ -72,7 +70,7 @@ public final class TraktAccount {
 
     public func cancelConnect() {
         authTask?.cancel()
-        pendingCode = nil
+        isWaitingForBrowser = false
     }
 
     public func disconnect() async {

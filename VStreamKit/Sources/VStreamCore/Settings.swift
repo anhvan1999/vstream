@@ -31,7 +31,9 @@ public struct AppSettings: Codable, Sendable, Hashable {
     public var preferredSubtitleLanguages: [String] = []
     public var subtitleStyle = SubtitleStyle()
     public var showAdultCatalogs = false
-    public var traktClientID = ""
+    /// VStream's Trakt API app; users can replace it with their own.
+    public static let defaultTraktClientID = "Gygs0cYBI-9RRis34B3ldyJ9na__i8jAs3ULbuyhqCY"
+    public var traktClientID = AppSettings.defaultTraktClientID
     public var hiddenHomeRows: Set<String> = []
 
     public init() {}
@@ -53,7 +55,8 @@ public struct AppSettings: Codable, Sendable, Hashable {
         preferredSubtitleLanguages = (try? container.decode([String].self, forKey: .preferredSubtitleLanguages)) ?? []
         subtitleStyle = (try? container.decode(SubtitleStyle.self, forKey: .subtitleStyle)) ?? defaults.subtitleStyle
         showAdultCatalogs = (try? container.decode(Bool.self, forKey: .showAdultCatalogs)) ?? false
-        traktClientID = (try? container.decode(String.self, forKey: .traktClientID)) ?? ""
+        let clientID = (try? container.decode(String.self, forKey: .traktClientID)) ?? ""
+        traktClientID = clientID.isEmpty ? AppSettings.defaultTraktClientID : clientID
         hiddenHomeRows = (try? container.decode(Set<String>.self, forKey: .hiddenHomeRows)) ?? []
     }
 }
@@ -76,15 +79,10 @@ public final class SettingsStore {
         didSet { Keychain.set(debridAPIKey.isEmpty ? nil : debridAPIKey, for: "debrid.\(settings.debridService?.rawValue ?? "none")") }
     }
 
-    public var traktClientSecret: String {
-        didSet { Keychain.set(traktClientSecret.isEmpty ? nil : traktClientSecret, for: "trakt.clientSecret") }
-    }
-
     public init() {
         let settings = JSONStore.load(AppSettings.self, from: "settings") ?? AppSettings()
         self.settings = settings
         debridAPIKey = settings.debridService.flatMap { Keychain.string("debrid.\($0.rawValue)") } ?? ""
-        traktClientSecret = Keychain.string("trakt.clientSecret") ?? ""
         let torrent = settings.torrent
         Task { await TorrentStreamer.shared.apply(torrent) }
     }

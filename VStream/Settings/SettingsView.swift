@@ -74,36 +74,34 @@ private struct AccountsSettings: View {
                         Spacer()
                         Button("Disconnect", role: .destructive) { Task { await app.trakt.disconnect() } }
                     }
-                } else if let code = app.trakt.pendingCode {
-                    LabeledContent("Code") {
-                        Text(code.userCode).font(.title2.monospaced().weight(.bold)).textSelection(.enabled)
-                    }
+                } else if app.trakt.isWaitingForBrowser {
                     HStack {
-                        Button("Open \(code.verificationURL.host ?? "trakt.tv")") { openURL(code.verificationURL) }
-                            .buttonStyle(.glassProminent)
                         ProgressView().controlSize(.small)
+                        Text("Approve VStream in your browser…")
                         Spacer()
                         Button("Cancel") { app.trakt.cancelConnect() }
                     }
                 } else {
                     TextField("Client ID", text: $settings.settings.traktClientID)
                         .onChange(of: settings.settings.traktClientID) { app.trakt.credentialsChanged() }
-                    SecureField("Client Secret", text: $settings.traktClientSecret)
-                        .onChange(of: settings.traktClientSecret) { app.trakt.credentialsChanged() }
                     HStack {
                         Link("Create a Trakt API app", destination: URL(string: "https://trakt.tv/oauth/applications/new")!)
                             .font(.caption)
                         Spacer()
-                        Button("Connect") { app.trakt.connect() }
-                            .buttonStyle(.glassProminent)
-                            .disabled(!app.trakt.hasCredentials)
+                        Button("Connect") {
+                            app.trakt.connect { url in
+                                await MainActor.run { _ = NSWorkspace.shared.open(url) }
+                            }
+                        }
+                        .buttonStyle(.glassProminent)
+                        .disabled(!app.trakt.hasCredentials)
                     }
                 }
                 if let error = app.trakt.lastError { Text(error).foregroundStyle(.red).font(.caption) }
             } header: {
                 Text("Trakt")
             } footer: {
-                Text("Use “http://localhost” as the redirect URI when creating the Trakt app.")
+                Text("Set the Trakt app’s redirect URI to “http://localhost:8765/trakt”.")
             }
         }
         .formStyle(.grouped)

@@ -57,8 +57,9 @@ Metal API validation is disabled in the scheme because MoltenVK trips it on HDR 
 
 ## Trakt
 
-Create an API app at https://trakt.tv/oauth/applications/new with redirect URI `http://localhost`,
-then paste the client ID and secret in Settings → Accounts.
+VStream ships a public Trakt client ID (no secret). Sign-in uses the authorization code flow with PKCE: Connect
+opens the browser, and the redirect to `http://localhost:8765/trakt` is captured on the loopback interface.
+To use your own Trakt app, register that redirect URI and set its client ID in Settings → Accounts.
 
 ## License
 

@@ -41,6 +41,10 @@ let package = Package(
             resources: [.copy("Fixtures")]
         ),
         .testTarget(
+            name: "TraktKitTests",
+            dependencies: ["TraktKit"]
+        ),
+        .testTarget(
             name: "VStreamCoreTests",
             dependencies: ["VStreamCore", "DebridKit", "AddonKit", "StremioAPI"]
         ),

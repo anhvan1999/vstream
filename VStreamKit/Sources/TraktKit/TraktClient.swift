@@ -1,12 +1,45 @@
+import CryptoKit
 import Foundation
 
+/// Public clients (desktop apps) have no secret and authenticate with PKCE instead.
 public struct TraktCredentials: Sendable, Hashable {
     public var clientID: String
-    public var clientSecret: String
+    public var clientSecret: String?
 
-    public init(clientID: String, clientSecret: String) {
+    public init(clientID: String, clientSecret: String? = nil) {
         self.clientID = clientID
-        self.clientSecret = clientSecret
+        self.clientSecret = clientSecret?.isEmpty == true ? nil : clientSecret
+    }
+
+    /// Adds `client_secret` only for confidential clients.
+    func signed(_ body: [String: Any]) -> [String: Any] {
+        var body = body
+        if let clientSecret { body["client_secret"] = clientSecret }
+        return body
+    }
+}
+
+/// RFC 7636 code verifier / S256 challenge pair.
+struct PKCE {
+    let verifier: String
+    let challenge: String
+
+    init() {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        self.init(verifier: Self.base64URL(Data(bytes)))
+    }
+
+    init(verifier: String) {
+        self.verifier = verifier
+        challenge = Self.base64URL(Data(SHA256.hash(data: Data(verifier.utf8))))
+    }
+
+    static func base64URL(_ data: Data) -> String {
+        data.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
     }
 }
 
@@ -93,6 +126,10 @@ public struct TraktPlayback: Sendable, Hashable {
 /// `onTokenRefresh` is invoked whenever a refreshed token should be persisted.
 public actor TraktClient {
     public static let baseURL = URL(string: "https://api.trakt.tv")!
+    /// Must match the redirect URI registered on the Trakt API app.
+    public static let redirectPort: UInt16 = 8765
+    public static let redirectPath = "/trakt"
+    public static let redirectURI = "http://localhost:\(redirectPort)\(redirectPath)"
 
     private let credentials: TraktCredentials
     private let session: URLSession
@@ -113,6 +150,43 @@ public actor TraktClient {
 
     public var isAuthorized: Bool { token != nil }
 
+    // MARK: Browser authorization (authorization code + loopback redirect)
+
+    /// Opens Trakt's consent page via `openURL`, captures the redirect on
+    /// `localhost:8765/trakt` and exchanges the code for a token.
+    public func authorizeInBrowser(openURL: @Sendable (URL) async -> Void) async throws -> TraktToken {
+        let server = LoopbackRedirectServer(port: Self.redirectPort, path: Self.redirectPath)
+        try await server.start()
+        let state = UUID().uuidString
+        let pkce = PKCE()
+        var components = URLComponents(string: "https://trakt.tv/oauth/authorize")!
+        components.queryItems = [
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "client_id", value: credentials.clientID),
+            URLQueryItem(name: "redirect_uri", value: Self.redirectURI),
+            URLQueryItem(name: "state", value: state),
+            URLQueryItem(name: "code_challenge", value: pkce.challenge),
+            URLQueryItem(name: "code_challenge_method", value: "S256"),
+        ]
+        await openURL(components.url!)
+        let query = try await server.waitForCallback()
+        guard query["state"] == state else { throw LoopbackError.denied("state mismatch") }
+        guard let code = query["code"] else { throw LoopbackError.denied(query["error"] ?? "no code returned") }
+
+        let (data, status) = try await raw("oauth/token", body: credentials.signed([
+            "code": code,
+            "code_verifier": pkce.verifier,
+            "client_id": credentials.clientID,
+            "redirect_uri": Self.redirectURI,
+            "grant_type": "authorization_code",
+        ]))
+        guard status == 200 else { throw status == 401 ? TraktError.notAuthorized : TraktError.http(status) }
+        let token = try decodeToken(data)
+        self.token = token
+        onTokenRefresh(token)
+        return token
+    }
+
     // MARK: Device authorization
 
     public func requestDeviceCode() async throws -> TraktDeviceCode {
@@ -126,11 +200,10 @@ public actor TraktClient {
         let deadline = Date().addingTimeInterval(TimeInterval(code.expiresIn))
         while Date() < deadline {
             try await Task.sleep(for: .seconds(interval))
-            let (data, status) = try await raw("oauth/device/token", body: [
+            let (data, status) = try await raw("oauth/device/token", body: credentials.signed([
                 "code": code.deviceCode,
                 "client_id": credentials.clientID,
-                "client_secret": credentials.clientSecret,
-            ])
+            ]))
             switch status {
             case 200:
                 let token = try decodeToken(data)
@@ -149,11 +222,10 @@ public actor TraktClient {
 
     public func signOut() async {
         if let token {
-            _ = try? await raw("oauth/revoke", body: [
+            _ = try? await raw("oauth/revoke", body: credentials.signed([
                 "token": token.accessToken,
                 "client_id": credentials.clientID,
-                "client_secret": credentials.clientSecret,
-            ])
+            ]))
         }
         token = nil
         onTokenRefresh(nil)
@@ -300,13 +372,12 @@ public actor TraktClient {
     }
 
     private func refresh(_ token: TraktToken) async throws -> TraktToken {
-        let (data, status) = try await raw("oauth/token", body: [
+        let (data, status) = try await raw("oauth/token", body: credentials.signed([
             "refresh_token": token.refreshToken,
             "client_id": credentials.clientID,
-            "client_secret": credentials.clientSecret,
-            "redirect_uri": "http://localhost",
+            "redirect_uri": Self.redirectURI,
             "grant_type": "refresh_token",
-        ])
+        ]))
         guard status == 200 else {
             self.token = nil
             onTokenRefresh(nil)
