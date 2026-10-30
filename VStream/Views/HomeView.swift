@@ -6,6 +6,7 @@ import VStreamCore
 struct HomeView: View {
     @Environment(AppModel.self) private var app
     private var featured: [MetaPreview] { app.homeFeatured }
+    @State private var overscroll: CGFloat = 0
 
     private var rows: [CatalogRow] {
         ContentService.homeRows(app.addons.enabled, includeAdult: app.settings.settings.showAdultCatalogs)
@@ -18,7 +19,7 @@ struct HomeView: View {
             // LazyVStack wasn't laid out until the next scroll.
             VStack(alignment: .leading, spacing: 30) {
                 if !featured.isEmpty {
-                    HeroCarousel(items: featured)
+                    HeroCarousel(items: featured, overscroll: overscroll)
                 } else {
                     ScreenHeader(title: "Home")
                 }
@@ -45,6 +46,12 @@ struct HomeView: View {
             .padding(.bottom, 40)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
+        // Clamped at 0, so normal scrolling doesn't update state.
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            max(0, -(geometry.contentOffset.y + geometry.contentInsets.top))
+        } action: { _, pull in
+            overscroll = pull
+        }
         #if os(iOS)
         // With the hero, the artwork runs up under the floating tab bar (no pale edge band).
         .scrollEdgeEffectHidden(!featured.isEmpty, for: .top)
@@ -58,6 +65,7 @@ struct HomeView: View {
 /// page dots.
 struct HeroCarousel: View {
     var items: [MetaPreview]
+    var overscroll: CGFloat = 0
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
@@ -67,7 +75,7 @@ struct HeroCarousel: View {
 
     var body: some View {
         ZStack {
-            HeroBanner(meta: items[index])
+            HeroBanner(meta: items[index], overscroll: overscroll)
                 .id(items[index].id)
                 .transition(.opacity)
         }
@@ -139,6 +147,8 @@ struct HeroCarousel: View {
 struct HeroBanner: View {
     @Environment(AppModel.self) private var app
     var meta: MetaPreview
+    /// How far the page is pulled down past its top (0 at rest).
+    var overscroll: CGFloat = 0
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -153,6 +163,12 @@ struct HeroBanner: View {
                 .backgroundExtensionEffect()
                 .overlay {
                     LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.35), location: 0.55), .init(color: Color.windowBackground, location: 1)], startPoint: .top, endPoint: .bottom)
+                }
+                // Pulling past the top stretches the artwork upward (anchored at its bottom) instead
+                // of uncovering an empty band above it while the scroll view bounces back.
+                .visualEffect { [overscroll] content, proxy in
+                    let height = max(proxy.size.height, 1)
+                    return content.scaleEffect((height + overscroll) / height, anchor: .bottom)
                 }
 
             VStack(alignment: .leading, spacing: 12) {
