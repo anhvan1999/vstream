@@ -82,37 +82,21 @@ struct SubtitlePanel: View {
                 } increase: {
                     player.setSubtitleDelay(player.subtitleDelay + 0.25)
                 }
-                stepper("Size", value: "\(Int(style.fontSize))") {
-                    updateStyle { $0.fontSize = max($0.fontSize - 4, 20) }
-                } increase: {
-                    updateStyle { $0.fontSize = min($0.fontSize + 4, 90) }
+                Text("Delay: Z / X (⇧ for 1 s)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 10)
+                Link(destination: SystemCaptionStyle.settingsURL) {
+                    Label("Caption style…", systemImage: "captions.bubble")
+                        .font(.callout)
                 }
-                stepper("Position", value: "\(Int(style.position))%") {
-                    updateStyle { $0.position = max($0.position - 2, 60) }
-                } increase: {
-                    updateStyle { $0.position = min($0.position + 2, 100) }
-                }
-                Toggle("Background", isOn: Binding(get: { style.backgroundOpacity > 0 }, set: { on in
-                    updateStyle { $0.backgroundOpacity = on ? 0.55 : 0 }
-                }))
-                .toggleStyle(.switch)
-                .controlSize(.small)
+                .help("Subtitles use your macOS caption style (System Settings → Accessibility → Captions)")
                 .padding(.horizontal, 10)
-                .padding(.top, 6)
+                .padding(.top, 8)
             }
         }
         .frame(height: 340)
         .environment(\.colorScheme, .dark)
-    }
-
-    private var style: SubtitleStyle { app.settings.settings.subtitleStyle }
-
-    /// Appearance changes persist as the default style and apply immediately.
-    private func updateStyle(_ change: (inout SubtitleStyle) -> Void) {
-        var style = app.settings.settings.subtitleStyle
-        change(&style)
-        app.settings.settings.subtitleStyle = style
-        player.apply(style)
     }
 
     private func variantTitle(_ track: MediaTrack, index: Int) -> String {

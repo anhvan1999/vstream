@@ -42,25 +42,6 @@ public struct ExternalSubtitle: Hashable, Sendable {
     }
 }
 
-public struct SubtitleStyle: Codable, Hashable, Sendable {
-    public var fontSize: Double
-    public var textColor: String
-    public var backgroundOpacity: Double
-    public var borderSize: Double
-    /// 0 (top) ... 100 (bottom); mpv default is 100.
-    public var position: Double
-    public var bold: Bool
-
-    public init(fontSize: Double = 46, textColor: String = "#FFFFFF", backgroundOpacity: Double = 0, borderSize: Double = 2.5, position: Double = 96, bold: Bool = false) {
-        self.fontSize = fontSize
-        self.textColor = textColor
-        self.backgroundOpacity = backgroundOpacity
-        self.borderSize = borderSize
-        self.position = position
-        self.bold = bold
-    }
-}
-
 public struct PlaybackRequest: Sendable {
     public var url: URL
     public var headers: [String: String]
@@ -120,7 +101,12 @@ public final class PlayerModel {
     @ObservationIgnored private var current: PlaybackRequest?
     @ObservationIgnored private var surfaceReady = false
     @ObservationIgnored private var lastPublishedPosition: Double = -1
-    @ObservationIgnored private var subtitleStyle = SubtitleStyle()
+    /// The current subtitle line as plain text (text subtitles only).
+    public private(set) var subtitleText = ""
+    /// Plain text subtitles are drawn by the app in the macOS caption style (as the Apple TV app
+    /// does) while mpv renders them invisibly. Bitmap (PGS/VobSub) and styled ASS subtitles stay
+    /// with mpv.
+    public private(set) var rendersSubtitlesInApp = false
     @ObservationIgnored private var lastLogLine: String?
     @ObservationIgnored private var fileLoaded = false
     /// Right after a seek mpv may still report the old time; ignore those so the UI doesn't jump back.
@@ -132,7 +118,7 @@ public final class PlayerModel {
             Task { @MainActor in self?.handle(events) }
         }
         controller.start(hardwareDecoding: hardwareDecoding, bufferMB: bufferMB)
-        apply(subtitleStyle)
+        updateSubtitleRendering(force: true)
     }
 
     var layer: CAMetalLayer { controller.layer }
@@ -254,16 +240,32 @@ public final class PlayerModel {
 
     public func setSubtitleDelay(_ seconds: Double) { controller.set("sub-delay", double: seconds) }
 
-    public func apply(_ style: SubtitleStyle) {
-        subtitleStyle = style
-        controller.set("sub-font-size", double: style.fontSize)
-        controller.set("sub-color", style.textColor)
-        controller.set("sub-border-size", double: style.borderSize)
-        controller.set("sub-pos", double: style.position)
-        controller.set("sub-bold", flag: style.bold)
-        let alpha = String(format: "%02X", Int(style.backgroundOpacity * 255))
-        controller.set("sub-back-color", "#\(alpha)000000")
-        controller.set("sub-border-style", style.backgroundOpacity > 0 ? "background-box" : "outline-and-shadow")
+    /// Relative, so repeated key presses add up before the observed value catches up.
+    public func adjustSubtitleDelay(by seconds: Double) { controller.command(["add", "sub-delay", String(seconds)]) }
+
+    private static let mpvOnlySubtitleCodecs: Set<String> = [
+        "ass", "ssa", "hdmv_pgs_subtitle", "pgssub", "dvd_subtitle", "dvdsub", "dvb_subtitle", "dvbsub", "xsub",
+    ]
+
+    private func updateSubtitleRendering(force: Bool = false) {
+        let codec = subtitleTracks.first { $0.id == selectedSubtitleID }?.codec?.lowercased()
+        let inApp = selectedSubtitleID != nil && !(codec.map(Self.mpvOnlySubtitleCodecs.contains) ?? false)
+        guard force || inApp != rendersSubtitlesInApp else { return }
+        rendersSubtitlesInApp = inApp
+        if inApp {
+            // Still rendered by mpv (so `sub-text` and timing keep working), just fully transparent.
+            controller.set("sub-color", "#00000000")
+            controller.set("sub-border-size", double: 0)
+            controller.set("sub-shadow-offset", double: 0)
+            controller.set("sub-back-color", "#00000000")
+            controller.set("sub-border-style", "outline-and-shadow")
+        } else {
+            // mpv's defaults, for the bitmap/ASS subtitles it draws itself.
+            controller.set("sub-color", "#FFFFFFFF")
+            controller.set("sub-border-size", double: 3)
+            controller.set("sub-shadow-offset", double: 0)
+            controller.set("sub-back-color", "#00000000")
+        }
     }
 
     public func screenshot() { controller.command(["screenshot", "subtitles"]) }
@@ -303,8 +305,14 @@ public final class PlayerModel {
                 case let ("mute", .flag(flag)): isMuted = flag
                 case let ("aid", .int(id)): selectedAudioID = Int(id)
                 case ("aid", .none), ("aid", .string): selectedAudioID = nil
-                case let ("sid", .int(id)): selectedSubtitleID = Int(id)
-                case ("sid", .none), ("sid", .string): selectedSubtitleID = nil
+                case let ("sid", .int(id)):
+                    selectedSubtitleID = Int(id)
+                    updateSubtitleRendering()
+                case ("sid", .none), ("sid", .string):
+                    selectedSubtitleID = nil
+                    updateSubtitleRendering()
+                case let ("sub-text", .string(text)): subtitleText = text
+                case ("sub-text", .none): subtitleText = ""
                 case let ("sub-delay", .double(value)): subtitleDelay = value
                 case let ("hwdec-current", .string(value)): hardwareDecoder = value == "no" ? nil : value
                 case let ("video-params/aspect", .double(value)) where value > 0.2 && value < 5:
@@ -331,6 +339,7 @@ public final class PlayerModel {
             case let .tracks(tracks):
                 audioTracks = tracks.filter { $0.kind == .audio }
                 subtitleTracks = tracks.filter { $0.kind == .sub }
+                updateSubtitleRendering()
             case let .chapters(list):
                 chapters = list
             }

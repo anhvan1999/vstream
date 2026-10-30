@@ -79,6 +79,7 @@ final class MPVController: @unchecked Sendable {
         ("aid", MPV_FORMAT_INT64),
         ("sid", MPV_FORMAT_INT64),
         ("sub-delay", MPV_FORMAT_DOUBLE),
+        ("sub-text", MPV_FORMAT_STRING),
         ("track-list/count", MPV_FORMAT_INT64),
         ("chapter-list/count", MPV_FORMAT_INT64),
         ("hwdec-current", MPV_FORMAT_STRING),
@@ -124,8 +125,7 @@ final class MPVController: @unchecked Sendable {
             ("keep-open", "yes"),
             ("idle", "yes"),
             ("ytdl", "no"),
-            // Built-in Lua scripts (OSC, stats, console, select, …) are unused; they also query the
-            // audio device list, whose CoreAudio hotplug callback crashed libmpv after teardown.
+            // Built-in Lua scripts (OSC, stats, console, select, …) are unused.
             ("osc", "no"),
             ("load-scripts", "no"),
             ("load-stats-overlay", "no"),
@@ -138,6 +138,11 @@ final class MPVController: @unchecked Sendable {
             ("load-osd-console", "no"),
             ("input-default-bindings", "no"),
             ("input-media-keys", "no"),
+            // AVFoundation output follows the system route itself. mpv's coreaudio output registers
+            // a CoreAudio device listener and leaks it when its init fails after that point
+            // (ca_init_chmap / init_audiounit, mpv 0.41), so a later headphone or speaker change
+            // called into a freed AO and crashed — even with the player closed.
+            ("ao", "avfoundation"),
             ("audio-channels", "auto"),
             ("audio-fallback-to-null", "yes"),
             ("subs-match-os-language", "yes"),

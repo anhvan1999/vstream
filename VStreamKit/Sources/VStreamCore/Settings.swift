@@ -32,7 +32,6 @@ public struct AppSettings: Codable, Sendable, Hashable {
     public var autoplayNextEpisode = true
     public var preferredAudioLanguages: [String] = []
     public var preferredSubtitleLanguages: [String] = []
-    public var subtitleStyle = SubtitleStyle()
     public var showAdultCatalogs = false
     /// VStream's Trakt API app; users can replace it with their own.
     public static let defaultTraktClientID = "Gygs0cYBI-9RRis34B3ldyJ9na__i8jAs3ULbuyhqCY"
@@ -43,7 +42,7 @@ public struct AppSettings: Codable, Sendable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case debridService, torrentMode, addUncachedToDebrid, torrent, hardwareDecoding, streamBufferMB, autoplayNextEpisode, preferredAudioLanguages
-        case preferredSubtitleLanguages, subtitleStyle, showAdultCatalogs, traktClientID, hiddenHomeRows
+        case preferredSubtitleLanguages, showAdultCatalogs, traktClientID, hiddenHomeRows
     }
 
     public init(from decoder: Decoder) throws {
@@ -58,7 +57,6 @@ public struct AppSettings: Codable, Sendable, Hashable {
         autoplayNextEpisode = (try? container.decode(Bool.self, forKey: .autoplayNextEpisode)) ?? defaults.autoplayNextEpisode
         preferredAudioLanguages = (try? container.decode([String].self, forKey: .preferredAudioLanguages)) ?? []
         preferredSubtitleLanguages = (try? container.decode([String].self, forKey: .preferredSubtitleLanguages)) ?? []
-        subtitleStyle = (try? container.decode(SubtitleStyle.self, forKey: .subtitleStyle)) ?? defaults.subtitleStyle
         showAdultCatalogs = (try? container.decode(Bool.self, forKey: .showAdultCatalogs)) ?? false
         let clientID = (try? container.decode(String.self, forKey: .traktClientID)) ?? ""
         traktClientID = clientID.isEmpty ? AppSettings.defaultTraktClientID : clientID

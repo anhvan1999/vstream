@@ -37,6 +37,8 @@ private struct PlayerScreen: View {
     @State private var isScrubbing = false
     @State private var showsSubtitles = false
     @State private var hideTask: Task<Void, Never>?
+    @State private var toast: Toast?
+    @State private var toastTask: Task<Void, Never>?
     @FocusState private var focused: Bool
 
     private var player: PlayerModel { session.player }
@@ -48,7 +50,29 @@ private struct PlayerScreen: View {
                 .onTapGesture(count: 2) { toggleFullScreen() }
                 .onTapGesture { player.togglePause() }
 
+            if player.rendersSubtitlesInApp, !player.subtitleText.isEmpty {
+                SubtitleOverlay(
+                    text: player.subtitleText,
+                    aspect: player.videoAspect,
+                    liftedBy: controlsVisible || !player.isPlaying ? 150 : 0
+                )
+                .animation(.easeInOut(duration: 0.2), value: controlsVisible)
+            }
+
             statusOverlay
+
+            if toast == .subtitleDelay {
+                // Reads the live value so it follows mpv as the presses land.
+                Text(String(format: "Subtitle delay %+.1f s", player.subtitleDelay))
+                    .font(.callout.weight(.semibold).monospacedDigit())
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .glassEffect(.regular, in: .capsule)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 44)
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+            }
 
             if controlsVisible || !player.isPlaying || !isReady {
                 controls
@@ -76,13 +100,25 @@ private struct PlayerScreen: View {
             revealControls()
         }
         .onKeyPress(.space) { player.togglePause(); revealControls(); return .handled }
-        .onKeyPress(.leftArrow) { player.seek(by: -10); revealControls(); return .handled }
-        .onKeyPress(.rightArrow) { player.seek(by: 10); revealControls(); return .handled }
+        // ←/→ 10 s, ⇧ 60 s, ⌥ 3 s.
+        .onKeyPress(keys: [.leftArrow, .rightArrow]) { press in
+            let step: Double = press.modifiers.contains(.shift) ? 60 : press.modifiers.contains(.option) ? 3 : 10
+            player.seek(by: press.key == .leftArrow ? -step : step)
+            revealControls()
+            return .handled
+        }
         .onKeyPress(.upArrow) { player.adjustVolume(by: 5); revealControls(); return .handled }
         .onKeyPress(.downArrow) { player.adjustVolume(by: -5); revealControls(); return .handled }
         .onKeyPress(.escape) {
             if isFullScreen { toggleFullScreen(); return .handled }
             return .ignored
+        }
+        // Subtitle delay, as in mpv: Z earlier, X later (±0.1 s; with ⇧ ±1 s).
+        .onKeyPress(characters: .init(charactersIn: "zxZX")) { press in
+            let step = press.characters == press.characters.uppercased() ? 1.0 : 0.1
+            player.adjustSubtitleDelay(by: press.characters.lowercased() == "z" ? -step : step)
+            showToast(.subtitleDelay)
+            return .handled
         }
         .onKeyPress(characters: .init(charactersIn: "fmsan")) { press in
             switch press.characters {
@@ -337,6 +373,18 @@ private struct PlayerScreen: View {
 
     // MARK: Helpers
 
+    private enum Toast { case subtitleDelay }
+
+    private func showToast(_ kind: Toast) {
+        withAnimation(.easeOut(duration: 0.15)) { toast = kind }
+        toastTask?.cancel()
+        toastTask = Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeIn(duration: 0.25)) { toast = nil }
+        }
+    }
+
     private func revealControls() {
         controlsVisible = true
         hideTask?.cancel()
@@ -584,4 +632,33 @@ private struct NextUpCard: View {
 /// Weak reference to an AppKit window, held in SwiftUI state without triggering updates.
 final class WindowHandle {
     weak var window: NSWindow?
+}
+
+/// Plain-text subtitles in the macOS caption style (System Settings → Accessibility → Captions),
+/// placed near the bottom of the picture like the Apple TV app.
+private struct SubtitleOverlay: View {
+    var text: String
+    var aspect: Double?
+    /// Raised above the controls while they're shown.
+    var liftedBy: CGFloat = 0
+    @State private var style = SystemCaptionStyle.current()
+
+    var body: some View {
+        GeometryReader { geometry in
+            let size = geometry.size
+            let videoHeight = aspect.map { min(size.height, size.width / max($0, 0.1)) } ?? size.height
+            let videoBottom = (size.height + videoHeight) / 2
+            // A box from the top of the window down to the caption baseline, text at its bottom.
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
+                SystemCaptionText(text: text, style: style, videoHeight: videoHeight)
+                    .frame(maxWidth: size.width * 0.9)
+            }
+            .frame(width: size.width, height: max(min(videoBottom - videoHeight * 0.06, size.height - liftedBy), 0))
+        }
+        .allowsHitTesting(false)
+        .onReceive(NotificationCenter.default.publisher(for: SystemCaptionStyle.changed)) { _ in
+            style = .current()
+        }
+    }
 }

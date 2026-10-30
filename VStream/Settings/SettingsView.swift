@@ -193,18 +193,13 @@ private struct PlaybackSettings: View {
             } footer: {
                 Text("Picked automatically when a video starts, from the file's tracks or your subtitle addons.")
             }
-            Section("Subtitle style") {
-                Slider(value: $settings.settings.subtitleStyle.fontSize, in: 24...80, step: 2) { Text("Size") }
-                Slider(value: $settings.settings.subtitleStyle.position, in: 70...100, step: 1) { Text("Position") }
-                Slider(value: $settings.settings.subtitleStyle.backgroundOpacity, in: 0...1) { Text("Background") }
-                Slider(value: $settings.settings.subtitleStyle.borderSize, in: 0...6, step: 0.5) { Text("Outline") }
-                Toggle("Bold", isOn: $settings.settings.subtitleStyle.bold)
+            Section("Subtitle appearance") {
+                LabeledContent("Font, size, colors and background follow your macOS caption style, like the Apple TV app.") {
+                    Link("Caption Settings…", destination: SystemCaptionStyle.settingsURL)
+                }
             }
         }
         .formStyle(.grouped)
-        .onChange(of: settings.settings.subtitleStyle) { _, style in
-            app.playback?.player.apply(style)
-        }
     }
 
     /// Settings store every code variant of the language so mpv's alang/slang and addon

@@ -49,7 +49,6 @@ final class PlaybackSession: Identifiable {
         self.video = video
         self.stream = stream
         player = PlayerModel(hardwareDecoding: app.settings.settings.hardwareDecoding, bufferMB: app.settings.settings.streamBufferMB)
-        player.apply(app.settings.settings.subtitleStyle)
         player.onEnded = { [weak self] in self?.handleEnded() }
         app.library.registerVideos(of: meta)
         start()
@@ -116,6 +115,12 @@ final class PlaybackSession: Identifiable {
                         preferredAudioLanguages: preferences.preferredAudioLanguages,
                         preferredSubtitleLanguages: preferences.preferredSubtitleLanguages
                     ))
+                    #if DEBUG
+                    // `VSTREAM_DEBUG_SUB=<file.srt>` attaches a subtitle, for checking the caption view.
+                    if let path = ProcessInfo.processInfo.environment["VSTREAM_DEBUG_SUB"] {
+                        self.player.addExternalSubtitles([ExternalSubtitle(url: URL(filePath: path), language: "vi", title: "Debug")])
+                    }
+                    #endif
                     self.stage = .playing
                     self.nowPlaying.attach(self.player, title: self.title, subtitle: self.subtitle)
                     self.startMonitoring(isTorrent: resolved.source == .peerToPeer)

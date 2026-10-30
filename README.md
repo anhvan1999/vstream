@@ -33,7 +33,9 @@ behaviour) and [stremio-core](https://github.com/Stremio/stremio-core) (API and 
   - A separate window that sizes itself to the video's aspect ratio and is the only window that goes full screen.
   - Glass controls and an Apple TV–style scrubber.
   - Audio, subtitle and chapter menus, and playback speed.
-  - A Stremio-style subtitle panel with addon subtitles, delay, size and position.
+  - A Stremio-style subtitle panel with addon subtitles and delay.
+  - Text subtitles use your **macOS caption style** (System Settings → Accessibility → Captions), drawn by
+    the app like the Apple TV app does. Bitmap (PGS/VobSub) and styled ASS subtitles are left to mpv.
   - Remembers where you stopped and offers the next episode.
   - Supports Now Playing and media keys, and keeps the Mac awake during playback.
 - **Default languages** for audio and subtitles, matched by ISO 639 codes and names.
@@ -193,7 +195,7 @@ VStream (SwiftUI app)
 
 | Where | Keys |
 |---|---|
-| Player | Space play/pause · ←/→ seek 10 s · ↑/↓ volume · F full screen · M mute · S/A cycle subtitles/audio · N next episode · Esc exit full screen |
+| Player | Space play/pause · ←/→ seek 10 s (⌥ 3 s, ⇧ 60 s) · ↑/↓ volume · Z/X subtitle delay ∓0.1 s (⇧ ∓1 s) · F full screen · M mute · S/A cycle subtitles/audio · N next episode · Esc exit full screen |
 | App | ⌘F Search · ⌘L Play Link · ⌘O Open Torrent File · ⌘R Refresh Addons · ⇧⌘R Sync Now · ⌘, Settings |
 
 ## Debugging
@@ -205,6 +207,7 @@ VSTREAM_DEBUG_PLAY="<https url or magnet>" VSTREAM_MPV_LOG=v \
   build/DerivedData/Build/Products/Debug/VStream.app/Contents/MacOS/VStream
 VSTREAM_DEBUG_OPEN="series:tt0903747" …   # open a detail page
 VSTREAM_DEBUG_META="movie:tt0816692" …    # borrow a real title's addon subtitles for DEBUG_PLAY
+VSTREAM_DEBUG_SUB="/path/to/file.srt" …    # attach a subtitle file to DEBUG_PLAY
 ```
 
 Metal API validation is disabled in the scheme because MoltenVK trips it on HDR content.
