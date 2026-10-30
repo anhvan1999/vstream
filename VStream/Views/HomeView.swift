@@ -117,10 +117,13 @@ struct HeroBanner: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            RemoteImage(url: meta.background)
-                // Tall enough to show the artwork rather than a thin crop: ~72% of the window.
-                .containerRelativeFrame(.vertical) { length, _ in max(length * 0.72, 520) }
+            // A window-wide box sized by the window height; the artwork fills it and is cropped.
+            // Sizing the filled image directly let it grow wider than the window in narrow
+            // windows, pushing the right side (dots, arrow) off screen.
+            Color.clear
                 .frame(maxWidth: .infinity)
+                .containerRelativeFrame(.vertical) { length, _ in max(length * 0.58, 420) }
+                .overlay { RemoteImage(url: meta.background) }
                 .clipped()
                 .backgroundExtensionEffect()
                 .overlay {
