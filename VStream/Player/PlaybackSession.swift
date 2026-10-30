@@ -115,6 +115,7 @@ final class PlaybackSession: Identifiable {
                 }
             } catch is CancellationError {
             } catch {
+                Self.log.notice("failed: \(error.localizedDescription, privacy: .public)")
                 self.stage = .failed(error.localizedDescription)
                 #if DEBUG
                 FileHandle.standardError.write(Data("[debug] failed: \(error)\n".utf8))

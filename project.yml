@@ -51,7 +51,6 @@ targets:
             CFBundleTypeExtensions: [torrent]
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
-          NSAllowsLocalNetworking: true
     entitlements:
       path: VStream/VStream.entitlements
       properties:

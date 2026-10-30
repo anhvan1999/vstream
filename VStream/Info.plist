@@ -62,8 +62,6 @@
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
 	</dict>
 	<key>NSHumanReadableCopyright</key>
 	<string>GPL-3.0</string>

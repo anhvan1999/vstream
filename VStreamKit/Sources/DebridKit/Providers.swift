@@ -111,19 +111,23 @@ public struct TorboxProvider: DebridProvider {
     }
 
     public func resolve(_ request: DebridRequest) async throws -> DebridLink {
-        let created = try await http.jsonObject(
-            base.appending(path: "torrents/createtorrent"),
-            method: "POST",
-            multipart: [("magnet", request.magnet), ("add_only_if_cached", "true"), ("allow_zip", "false")]
-        )
+        // With `add_only_if_cached`, an uncached torrent fails with DOWNLOAD_NOT_CACHED (as an
+        // HTTP error or a `success: false` body); report it as `.notCached` so automatic mode
+        // falls back to P2P.
+        let created: [String: Any]
+        do {
+            created = try await http.jsonObject(
+                base.appending(path: "torrents/createtorrent"),
+                method: "POST",
+                multipart: [("magnet", request.magnet), ("add_only_if_cached", "true"), ("allow_zip", "false")]
+            )
+        } catch let DebridError.api(message) where Self.isNotCached(message) {
+            throw DebridError.notCached
+        }
         guard created["success"] as? Bool != false else {
-            let detail = created["detail"] as? String
-            // With `add_only_if_cached`, an uncached torrent fails with DOWNLOAD_NOT_CACHED
-            // ("Download not cached…"); report it as such so automatic mode falls back to P2P.
-            if created["error"] as? String == "DOWNLOAD_NOT_CACHED" || detail?.range(of: "not cached", options: .caseInsensitive) != nil {
-                throw DebridError.notCached
-            }
-            throw DebridError.api(detail ?? "TorBox rejected the torrent")
+            let message = created["error"] as? String ?? created["detail"] as? String
+            if let message, Self.isNotCached(message) { throw DebridError.notCached }
+            throw DebridError.api(created["detail"] as? String ?? "TorBox rejected the torrent")
         }
         let data = created["data"] as? [String: Any] ?? [:]
         guard let torrentID = data.int("torrent_id") ?? data.int("id") else { throw DebridError.notCached }
@@ -151,6 +155,10 @@ public struct TorboxProvider: DebridProvider {
             throw DebridError.api(link["detail"] as? String ?? "TorBox did not return a link")
         }
         return DebridLink(url: url, filename: selected.basename, size: selected.size)
+    }
+
+    private static func isNotCached(_ message: String) -> Bool {
+        message == "DOWNLOAD_NOT_CACHED" || message.range(of: "not cached", options: .caseInsensitive) != nil
     }
 }
 
