@@ -27,7 +27,7 @@ public struct AppSettings: Codable, Sendable, Hashable {
     public var torrent = TorrentSettings()
     public var hardwareDecoding = true
     /// mpv's in-memory stream buffer (read-ahead), in megabytes.
-    public var streamBufferMB = 300
+    public var streamBufferMB = 512
     public var autoplayNextEpisode = true
     public var preferredAudioLanguages: [String] = []
     public var preferredSubtitleLanguages: [String] = []

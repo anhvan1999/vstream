@@ -256,6 +256,24 @@ private struct StreamCard: View {
             .contentShape(.rect(cornerRadius: 12))
         }
         .buttonStyle(.plain)
+        .overlay(alignment: .bottomTrailing) {
+            if isHovering {
+                Menu {
+                    StreamLinkMenuItems(stream: stream, play: action)
+                } label: {
+                    Image(systemName: "ellipsis").font(.caption.weight(.bold)).frame(width: 22, height: 22)
+                }
+                .menuStyle(.button)
+                .menuIndicator(.hidden)
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .controlSize(.small)
+                .fixedSize()
+                .padding(8)
+                .help("More")
+            }
+        }
+        .contextMenu { StreamLinkMenuItems(stream: stream, play: action) }
         .onHover { isHovering = $0 }
         .animation(.easeOut(duration: 0.12), value: isHovering)
     }

@@ -22,6 +22,7 @@ final class PlaybackSession: Identifiable {
     private(set) var stream: AddonStream
     private(set) var stage: PlaybackStage = .resolving("Preparing")
     private(set) var source: PlaybackSource?
+    private(set) var resolvedURL: URL?
     private(set) var torrentStats: TorrentStats?
     private(set) var addonSubtitles: [Subtitle] = []
     private(set) var nextVideo: Video?
@@ -85,6 +86,7 @@ final class PlaybackSession: Identifiable {
                     self.stage = .failed("Opened in your browser")
                 case let .play(resolved):
                     self.source = resolved.source
+                    self.resolvedURL = resolved.url
                     self.player.load(PlaybackRequest(
                         url: resolved.url,
                         headers: resolved.headers,
@@ -198,6 +200,13 @@ final class PlaybackSession: Identifiable {
                 self.stage = .failed("No streams found for the next episode")
             }
         })
+    }
+
+    /// Link for "Copy Stream Link": the URL being played, except for P2P where the loopback URL
+    /// is useless elsewhere and the magnet is shared instead.
+    var shareableLink: String? {
+        if source == .peerToPeer { return stream.magnetURI }
+        return resolvedURL?.absoluteString ?? StreamLinks.shareable(stream)
     }
 
     func dismissNextUp() {

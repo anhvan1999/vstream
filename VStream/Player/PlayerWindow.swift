@@ -303,6 +303,13 @@ private struct PlayerScreen: View {
                 ForEach([0.5, 0.75, 1, 1.25, 1.5, 2], id: \.self) { Text("\($0.formatted())×").tag($0) }
             }
             Divider()
+            if let link = session.shareableLink {
+                Button("Copy Stream Link", systemImage: "link") { StreamLinks.copy(link) }
+            }
+            if session.stream.isTorrent, let hash = session.stream.infoHash {
+                Button("Copy Info Hash", systemImage: "number") { StreamLinks.copy(hash) }
+            }
+            Divider()
             Button(player.isMuted ? "Unmute" : "Mute") { player.toggleMute() }
             Button("Volume Up (↑)") { player.adjustVolume(by: 10) }
             Button("Volume Down (↓)") { player.adjustVolume(by: -10) }
