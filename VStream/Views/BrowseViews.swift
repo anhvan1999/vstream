@@ -71,6 +71,11 @@ struct DiscoverView: View {
 
 struct SearchView: View {
     @Environment(AppModel.self) private var app
+    #if os(macOS)
+    private static let emptyPrompt = "Type a title in the search field above."
+    #else
+    private static let emptyPrompt = "Search every addon for movies, shows and channels."
+    #endif
     var query: String
     @State private var results: [SearchResultGroup] = []
     @State private var isSearching = false
@@ -117,7 +122,7 @@ struct SearchView: View {
                 EmptyStateView(
                     title: query.isEmpty ? "Search" : "No results",
                     symbol: "magnifyingglass",
-                    message: query.isEmpty ? "Type a title in the search field above." : "No addon found anything for “\(query)”."
+                    message: query.isEmpty ? Self.emptyPrompt : "No addon found anything for “\(query)”."
                 )
             }
         }
@@ -135,7 +140,12 @@ private struct ToolbarSearch: ViewModifier {
         #if os(macOS)
             .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
         #endif
+            #if os(macOS)
             .searchable(text: $app.searchText, placement: .toolbarPrincipal, prompt: "Movies, shows, channels")
+            #else
+            // The Search tab's own field (bottom bar on iPhone, top of the page on iPad).
+            .searchable(text: $app.searchText, prompt: "Movies, shows, channels")
+            #endif
             .searchFocused($focused)
             .onAppear { focused = true }
     }
@@ -164,6 +174,15 @@ struct LibraryView: View {
     var body: some View {
         ScrollView {
             ScreenHeader(title: "Library", subtitle: "\(items.count) items") {
+                #if os(iOS)
+                if horizontalSizeClass == .compact {
+                    // iPhone: no sidebar account badge, so Settings (and Addons) open here; first, so it
+                    // isn't scrolled off the end of the row.
+                    Button("Settings", systemImage: "gearshape") { app.showsSettings = true }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.glass)
+                }
+                #endif
                 Picker("Type", selection: $filter) {
                     Text("All").tag("all")
                     Text("Movies").tag("movie")
@@ -175,14 +194,6 @@ struct LibraryView: View {
                     ForEach(Sort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
                 .fixedSize()
-                #if os(iOS)
-                if horizontalSizeClass == .compact {
-                    // iPhone: no sidebar account badge, so Settings (and Addons) open here.
-                    Button("Settings", systemImage: "gearshape") { app.showsSettings = true }
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.glass)
-                }
-                #endif
             }
             PosterGrid(items: items) { item in
                 Button {

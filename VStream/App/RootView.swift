@@ -3,10 +3,10 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var app
-
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
+
 
     var body: some View {
         @Bindable var app = app
@@ -49,6 +49,10 @@ struct RootView: View {
 
     /// `VSTREAM_DEBUG_PLAY=<url|magnet>` opens the player directly, for end-to-end checks.
     private func debugAutoplay() {
+        // `VSTREAM_DEBUG_TAB=<home|search|discover|library|playLink|addons>` opens that tab.
+        if let tab = ProcessInfo.processInfo.environment["VSTREAM_DEBUG_TAB"].flatMap(SidebarItem.init(rawValue:)) {
+            app.selection = tab
+        }
         // `VSTREAM_DEBUG_OPEN=<type>:<id>` opens a detail page, for screenshots.
         if let route = ProcessInfo.processInfo.environment["VSTREAM_DEBUG_OPEN"]?.split(separator: ":", maxSplits: 1), route.count == 2 {
             Task {
@@ -79,51 +83,54 @@ struct RootView: View {
     }
     #endif
 
-    /// Sidebar on the Mac and iPad; a tab bar on iPhone, where the sidebar would collapse away.
+    /// The Mac keeps its split view; iPhone/iPad use a sidebar-adaptable tab view, like the Apple
+    /// TV app: a sidebar on iPad that collapses into a tab strip, a tab bar on iPhone.
     @ViewBuilder private var layout: some View {
         #if os(iOS)
-        if horizontalSizeClass == .compact {
-            tabLayout
-        } else {
-            splitLayout
-        }
+        tabLayout
         #else
-        splitLayout
+        NavigationSplitView { sidebar } detail: { detailStack(content) }
         #endif
     }
 
-    private var splitLayout: some View {
-        NavigationSplitView {
-            List(selection: sidebarSelection) {
-                Section {
-                    ForEach([SidebarItem.home, .search, .discover, .library, .playLink]) { item in
-                        Label(item.title, systemImage: item.symbol).tag(item)
-                    }
-                }
-                Section("Manage") {
-                    Label(SidebarItem.addons.title, systemImage: SidebarItem.addons.symbol).tag(SidebarItem.addons)
+    private var sidebar: some View {
+        List(selection: sidebarSelection) {
+            Section {
+                ForEach([SidebarItem.home, .search, .discover, .library, .playLink]) { item in
+                    Label(item.title, systemImage: item.symbol).tag(item)
                 }
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
-            .safeAreaInset(edge: .bottom) { AccountBadge().padding(10) }
-        } detail: {
-            detailStack(content)
+            Section("Manage") {
+                Label(SidebarItem.addons.title, systemImage: SidebarItem.addons.symbol).tag(SidebarItem.addons)
+            }
         }
+        .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
+        .safeAreaInset(edge: .bottom) { AccountBadge().padding(10) }
     }
 
     #if os(iOS)
     private var tabLayout: some View {
         TabView(selection: sidebarSelection) {
-            // Four tabs plus Search fit the bar; Addons lives in Settings (⚙︎ on Library).
             ForEach([SidebarItem.home, .discover, .library, .playLink]) { item in
                 Tab(item.title, systemImage: item.symbol, value: Optional(item)) {
                     detailStack(content(for: item))
+                }
+            }
+            // iPad only: four tabs plus Search fill an iPhone tab bar (more would add "More"), so
+            // there Addons is reached through Settings (⚙︎ on Library).
+            if horizontalSizeClass != .compact {
+                TabSection("Manage") {
+                    Tab(SidebarItem.addons.title, systemImage: SidebarItem.addons.symbol, value: Optional(SidebarItem.addons)) {
+                        detailStack(content(for: .addons))
+                    }
                 }
             }
             Tab(SidebarItem.search.title, systemImage: SidebarItem.search.symbol, value: Optional(SidebarItem.search), role: .search) {
                 detailStack(content(for: .search))
             }
         }
+        .tabViewStyle(.sidebarAdaptable)
+        .tabViewSidebarBottomBar { AccountBadge().padding(.horizontal, 4) }
     }
     #endif
 

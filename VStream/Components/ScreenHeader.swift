@@ -4,28 +4,61 @@ import SwiftUI
 /// It is the first item of the page's scroll content, so it scrolls away instead of floating over posters.
 struct ScreenHeader<Controls: View>: View {
     @Environment(AppModel.self) private var app
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
     var title: String
     var subtitle: String?
     @ViewBuilder var controls: Controls
 
     var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.title2.weight(.bold))
-                if let subtitle {
-                    Text(subtitle).font(.callout).foregroundStyle(.secondary)
+        Group {
+            if isCompact {
+                // iPhone: a large title, with the controls on their own swipeable row below.
+                VStack(alignment: .leading, spacing: 12) {
+                    titleBlock(font: .largeTitle.weight(.bold))
+                    ScrollView(.horizontal) {
+                        GlassEffectContainer(spacing: 8) {
+                            HStack(spacing: 8) { controls }.labelsHidden()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 2)
+                    }
+                    .scrollIndicators(.never)
+                    .padding(.horizontal, -16)
                 }
-            }
-            Spacer(minLength: 12)
-            GlassEffectContainer(spacing: 10) {
-                HStack(spacing: 10) { controls }.labelsHidden()
+            } else {
+                HStack(alignment: .center, spacing: 16) {
+                    titleBlock(font: .title2.weight(.bold))
+                    Spacer(minLength: 12)
+                    GlassEffectContainer(spacing: 10) {
+                        HStack(spacing: 10) { controls }.labelsHidden()
+                    }
+                }
             }
         }
         // Leave room for the floating back button when a page is pushed.
-        .padding(.leading, app.path.isEmpty ? 28 : 76)
-        .padding(.trailing, 28)
-        .padding(.top, 18)
+        .padding(.leading, isCompact ? 16 : (app.path.isEmpty ? 28 : 76))
+        .padding(.trailing, isCompact ? 16 : 28)
+        .padding(.top, isCompact ? 8 : 18)
         .padding(.bottom, 12)
+    }
+
+    private func titleBlock(font: Font) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(font)
+            if let subtitle {
+                Text(subtitle).font(.callout).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var isCompact: Bool {
+        #if os(iOS)
+        horizontalSizeClass == .compact
+        #else
+        false
+        #endif
     }
 }
 

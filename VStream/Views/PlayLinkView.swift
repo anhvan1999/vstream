@@ -18,6 +18,18 @@ struct PlayLinkView: View {
     @State private var showsAllFiles = false
     @State private var work: Task<Void, Never>?
     @State private var lastOpened: (link: String, at: Date)?
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
+
+    /// iPhone: tighter card, smaller controls, no drag-and-drop hint.
+    private var isCompact: Bool {
+        #if os(iOS)
+        horizontalSizeClass == .compact
+        #else
+        false
+        #endif
+    }
     @FocusState private var fieldFocused: Bool
 
     private enum Phase {
@@ -50,8 +62,8 @@ struct PlayLinkView: View {
                 }
                 .frame(maxWidth: 680)
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal, 28)
-                .padding(.top, 24)
+                .padding(.horizontal, isCompact ? 16 : 28)
+                .padding(.top, isCompact ? 8 : 24)
                 .padding(.bottom, 40)
             }
         }
@@ -82,7 +94,10 @@ struct PlayLinkView: View {
         }
         .navigationTitle("Play Link")
         .onAppear {
+            // iPhone/iPad: don't pop the keyboard just for opening the tab.
+            #if os(macOS)
             fieldFocused = true
+            #endif
             consumePending()
         }
         .onChange(of: app.pendingLink) { consumePending() }
@@ -100,23 +115,31 @@ struct PlayLinkView: View {
     // MARK: Input
 
     private var inputCard: some View {
-        VStack(spacing: 18) {
-            Image(systemName: "play.rectangle.on.rectangle")
-                .font(.system(size: 38, weight: .regular))
-                .foregroundStyle(.secondary)
-                .padding(.top, 6)
+        VStack(spacing: isCompact ? 14 : 18) {
+            if !isCompact {
+                Image(systemName: "play.rectangle.on.rectangle")
+                    .font(.system(size: 38, weight: .regular))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 6)
+            }
             VStack(spacing: 4) {
-                Text("Paste a link to play").font(.title3.weight(.semibold))
+                Text("Paste a link to play").font(isCompact ? .headline : .title3.weight(.semibold))
                 Text("http(s) video or HLS · magnet link · info hash · .torrent file")
-                    .font(.callout)
+                    .font(isCompact ? .footnote : .callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
 
             HStack(spacing: 10) {
                 Image(systemName: "link").foregroundStyle(.secondary)
-                TextField("https://…  or  magnet:?xt=urn:btih:…", text: $input)
+                TextField(isCompact ? "https://… or magnet:…" : "https://…  or  magnet:?xt=urn:btih:…", text: $input)
                     .textFieldStyle(.plain)
+                    #if os(iOS)
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.go)
+                    #endif
                     .focused($fieldFocused)
                     .onSubmit { open(input) }
                     // A paste into the empty field plays right away; typing waits for Return.
@@ -128,11 +151,12 @@ struct PlayLinkView: View {
                 } else {
                     Button("Play") { open(input) }
                         .buttonStyle(.glassProminent)
+                        .controlSize(isCompact ? .small : .regular)
                         .disabled(LinkInput(input) == nil)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.horizontal, isCompact ? 12 : 14)
+            .padding(.vertical, isCompact ? 8 : 10)
             .glassEffect(.regular, in: .capsule)
 
             switch phase {
@@ -155,16 +179,19 @@ struct PlayLinkView: View {
             }
 
             HStack(spacing: 12) {
-                Button("Open Torrent File…", systemImage: "doc.badge.arrow.up") { app.isImportingTorrent = true }
+                Button(isCompact ? "Open .torrent File" : "Open Torrent File…", systemImage: "doc.badge.arrow.up") { app.isImportingTorrent = true }
                     .buttonStyle(.glass)
-                Text("or drop a .torrent or video file anywhere in this window")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .controlSize(isCompact ? .small : .regular)
+                if !isCompact {
+                    Text("or drop a .torrent or video file anywhere in this window")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
             }
         }
-        .padding(24)
+        .padding(isCompact ? 16 : 24)
         .frame(maxWidth: .infinity)
-        .glassEffect(.regular, in: .rect(cornerRadius: 24))
+        .glassEffect(.regular, in: .rect(cornerRadius: isCompact ? 20 : 24))
     }
 
     // MARK: File picker
