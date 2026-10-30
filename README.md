@@ -64,6 +64,9 @@ These plays are not recorded in Continue Watching or Trakt.
   | Debrid only | Never streams peer-to-peer |
   | P2P only | Never uses debrid |
 
+- **Add uncached torrents to debrid** (on by default): a torrent that isn't cached is sent to the debrid
+  service to download while it streams peer-to-peer, so the next play starts instantly. Debrid-only mode
+  queues it instead.
 - Peer-to-peer streaming uses nuvio-engine (libtorrent), which serves the selected file over a loopback HTTP range server.
   - The engine prioritises the pieces the player needs next.
   - You can choose a speed profile and the disk cache size, and turn uploading off.
