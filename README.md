@@ -57,7 +57,7 @@ Metal API validation is disabled in the scheme because MoltenVK trips it on HDR 
 
 ## Trakt
 
-Create an API app at https://trakt.tv/oauth/applications/new with redirect URI `urn:ietf:wg:oauth:2.0:oob`,
+Create an API app at https://trakt.tv/oauth/applications/new with redirect URI `http://localhost`,
 then paste the client ID and secret in Settings → Accounts.
 
 ## License

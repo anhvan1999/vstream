@@ -103,7 +103,7 @@ private struct AccountsSettings: View {
             } header: {
                 Text("Trakt")
             } footer: {
-                Text("Use “urn:ietf:wg:oauth:2.0:oob” as the redirect URI when creating the Trakt app.")
+                Text("Use “http://localhost” as the redirect URI when creating the Trakt app.")
             }
         }
         .formStyle(.grouped)

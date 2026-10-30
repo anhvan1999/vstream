@@ -304,7 +304,7 @@ public actor TraktClient {
             "refresh_token": token.refreshToken,
             "client_id": credentials.clientID,
             "client_secret": credentials.clientSecret,
-            "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
+            "redirect_uri": "http://localhost",
             "grant_type": "refresh_token",
         ])
         guard status == 200 else {
