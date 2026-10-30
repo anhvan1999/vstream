@@ -32,6 +32,8 @@ private struct PlayerScreen: View {
 
     @State private var controlsVisible = true
     @State private var isFullScreen = false
+    /// The player's own window; `NSApp.keyWindow` can be the full-screen title-bar window instead.
+    @State private var hostWindow = WindowHandle()
     @State private var isScrubbing = false
     @State private var showsSubtitles = false
     @State private var hideTask: Task<Void, Never>?
@@ -78,7 +80,7 @@ private struct PlayerScreen: View {
         .onKeyPress(.upArrow) { player.adjustVolume(by: 5); revealControls(); return .handled }
         .onKeyPress(.downArrow) { player.adjustVolume(by: -5); revealControls(); return .handled }
         .onKeyPress(.escape) {
-            if NSApp.keyWindow?.styleMask.contains(.fullScreen) == true { toggleFullScreen(); return .handled }
+            if isFullScreen { toggleFullScreen(); return .handled }
             return .ignored
         }
         .onKeyPress(characters: .init(charactersIn: "fmsan")) { press in
@@ -96,7 +98,10 @@ private struct PlayerScreen: View {
         .navigationTitle(session.title)
         // Read from the window itself: this view is recreated per session, possibly while the
         // window is already full screen.
-        .onFullScreenChange { isFullScreen = $0 }
+        .onFullScreenChange { fullScreen, window in
+            isFullScreen = fullScreen
+            hostWindow.window = window
+        }
         // Dragging produces no hover events; keep the controls up while scrubbing.
         .onChange(of: isScrubbing) { revealControls() }
     }
@@ -337,7 +342,7 @@ private struct PlayerScreen: View {
     }
 
     private func toggleFullScreen() {
-        NSApp.keyWindow?.toggleFullScreen(nil)
+        (hostWindow.window ?? NSApp.keyWindow)?.toggleFullScreen(nil)
     }
 
     private func cycle(_ tracks: [MediaTrack], selected: Int?, allowOff: Bool, select: (Int?) -> Void) {
@@ -531,4 +536,9 @@ private struct NextUpCard: View {
         .glassEffect(.regular, in: .rect(cornerRadius: 20))
         .environment(\.colorScheme, .dark)
     }
+}
+
+/// Weak reference to an AppKit window, held in SwiftUI state without triggering updates.
+final class WindowHandle {
+    weak var window: NSWindow?
 }

@@ -61,10 +61,10 @@ extension View {
 /// Reports the hosting window's full-screen state: once when attached (so views created while
 /// the window is already full screen start correct) and on every enter/exit of that window.
 private struct FullScreenReader: NSViewRepresentable {
-    let onChange: (Bool) -> Void
+    let onChange: (Bool, NSWindow) -> Void
 
     final class ReaderView: NSView {
-        var onChange: ((Bool) -> Void)?
+        var onChange: ((Bool, NSWindow) -> Void)?
         private var tokens: [NSObjectProtocol] = []
 
         override func viewDidMoveToWindow() {
@@ -72,9 +72,12 @@ private struct FullScreenReader: NSViewRepresentable {
             tokens.forEach(NotificationCenter.default.removeObserver)
             tokens = []
             guard let window else { return }
-            let report: @MainActor @Sendable (Bool) -> Void = { [weak self] value in self?.onChange?(value) }
-            DispatchQueue.main.async { [weak window] in
-                if let window { report(window.styleMask.contains(.fullScreen)) }
+            let report: @MainActor @Sendable (Bool) -> Void = { [weak self] value in
+                guard let self, let window = self.window else { return }
+                self.onChange?(value, window)
+            }
+            DispatchQueue.main.async { [weak self] in
+                if let window = self?.window { report(window.styleMask.contains(.fullScreen)) }
             }
             let center = NotificationCenter.default
             tokens = [
@@ -102,8 +105,8 @@ private struct FullScreenReader: NSViewRepresentable {
 }
 
 extension View {
-    /// Calls `action` with the hosting window's full-screen state, initially and on change.
-    func onFullScreenChange(_ action: @escaping (Bool) -> Void) -> some View {
+    /// Calls `action` with the hosting window and its full-screen state, initially and on change.
+    func onFullScreenChange(_ action: @escaping (Bool, NSWindow) -> Void) -> some View {
         background(FullScreenReader(onChange: action))
     }
 }
