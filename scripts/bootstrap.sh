@@ -50,8 +50,8 @@ fi
 # the app across rebuilds. Ad-hoc signatures change every build.
 local_config="${repository_root}/Config/Local.xcconfig"
 if [[ ! -f "${local_config}" ]]; then
-    team_id="$(defaults read com.apple.dt.Xcode IDEProvisioningTeamByIdentifier 2>/dev/null \
-        | sed -nE 's/.*teamID = "?([A-Z0-9]{10})"?;.*/\1/p' | head -1)"
+    team_id="$(plutil -p "${HOME}/Library/Preferences/com.apple.dt.Xcode.plist" 2>/dev/null \
+        | sed -nE 's/.*"teamID" => "([A-Z0-9]{10})".*/\1/p' | head -1)"
     if [[ -n "${team_id}" ]]; then
         printf 'DEVELOPMENT_TEAM = %s\nCODE_SIGN_IDENTITY = Apple Development\n' "${team_id}" > "${local_config}"
         echo "Signing with team ${team_id} (Config/Local.xcconfig)"
