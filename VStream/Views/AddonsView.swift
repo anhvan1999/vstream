@@ -15,7 +15,7 @@ struct AddonsView: View {
         VStack(alignment: .leading, spacing: 0) {
             ScreenHeader(title: "Addons", subtitle: "\(app.addons.addons.count) installed") {
                 Button("Browse Community Addons", systemImage: "globe") {
-                    openURL(URL(string: "https://stremio-addons.com")!)
+                    openURL(URL(string: "https://stremio-addons.net")!)
                 }
                 .buttonStyle(.glass)
                 Button("Refresh", systemImage: "arrow.clockwise") {

@@ -4,7 +4,7 @@ import Observation
 import VStreamCore
 
 enum SidebarItem: String, Hashable, CaseIterable, Identifiable {
-    case home, discover, library, search, addons
+    case home, discover, library, search, playLink, addons
 
     var id: String { rawValue }
 
@@ -14,6 +14,7 @@ enum SidebarItem: String, Hashable, CaseIterable, Identifiable {
         case .discover: "Discover"
         case .library: "Library"
         case .search: "Search"
+        case .playLink: "Play Link"
         case .addons: "Addons"
         }
     }
@@ -24,6 +25,7 @@ enum SidebarItem: String, Hashable, CaseIterable, Identifiable {
         case .discover: "safari"
         case .library: "books.vertical"
         case .search: "magnifyingglass"
+        case .playLink: "link"
         case .addons: "puzzlepiece.extension"
         }
     }
@@ -51,6 +53,10 @@ final class AppModel {
     var searchText = ""
     var playback: PlaybackSession?
     var pendingAddonURL: String?
+    /// A link or `.torrent` handed to the app (drop, Open With, magnet URL) for Play Link to open.
+    var pendingLink: URL?
+    var isImportingTorrent = false
+    var playLinkFocusRequest = 0
     var alert: AppAlert?
 
     init() {
@@ -70,14 +76,29 @@ final class AppModel {
     }
 
     func handle(url: URL) {
-        guard url.scheme == "stremio" else { return }
-        pendingAddonURL = url.absoluteString
-        selection = .addons
+        switch url.scheme {
+        case "stremio":
+            pendingAddonURL = url.absoluteString
+            selection = .addons
+        case "magnet", "file":
+            path = []
+            selection = .playLink
+            pendingLink = url
+        default:
+            break
+        }
     }
 
-    func play(meta: MetaDetail, video: Video?, stream: AddonStream, recordsProgress: Bool = true) {
+    /// Switches to Play Link and focuses its field (⌘L).
+    func showPlayLink() {
+        path = []
+        selection = .playLink
+        playLinkFocusRequest += 1
+    }
+
+    func play(meta: MetaDetail, video: Video?, stream: AddonStream, recordsProgress: Bool = true, torrentFile: Data? = nil) {
         playback?.close()
-        playback = PlaybackSession(app: self, meta: meta, video: video, stream: stream, recordsProgress: recordsProgress)
+        playback = PlaybackSession(app: self, meta: meta, video: video, stream: stream, recordsProgress: recordsProgress, torrentFile: torrentFile)
     }
 
     func closePlayback() {

@@ -174,7 +174,7 @@ public final class PlayerModel {
         if !request.preferredSubtitleLanguages.isEmpty {
             controller.set("slang", request.preferredSubtitleLanguages.joined(separator: ","))
         }
-        var args = ["loadfile", request.url.absoluteString, "replace", "-1"]
+        var args = ["loadfile", request.url.isFileURL ? request.url.path : request.url.absoluteString, "replace", "-1"]
         if request.startTime > 1 {
             args.append("start=\(Int(request.startTime))")
         }

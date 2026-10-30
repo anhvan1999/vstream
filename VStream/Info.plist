@@ -6,6 +6,21 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>VStream</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>torrent</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>BitTorrent File</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -26,6 +41,14 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>stremio</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>Magnet link</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>magnet</string>
 			</array>
 		</dict>
 	</array>

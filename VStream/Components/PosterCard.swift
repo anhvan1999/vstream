@@ -32,26 +32,28 @@ struct PosterCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ZStack(alignment: .bottom) {
-                RemoteImage(url: poster)
-                    .frame(width: width, height: width / shape.aspectRatio)
-                    .overlay {
-                        if poster == nil {
-                            Text(title)
-                                .font(.callout.weight(.semibold))
-                                .multilineTextAlignment(.center)
-                                .padding(8)
-                                .foregroundStyle(.secondary)
-                        }
+            // Overlays, not a ZStack: the flexible progress bar would widen the card to its grid
+            // cell and leave bars beside the poster.
+            RemoteImage(url: poster)
+                .frame(width: width, height: width / shape.aspectRatio)
+                .overlay {
+                    if poster == nil {
+                        Text(title)
+                            .font(.callout.weight(.semibold))
+                            .multilineTextAlignment(.center)
+                            .padding(8)
+                            .foregroundStyle(.secondary)
                     }
-                if let progress, progress > 0 {
-                    ProgressView(value: progress)
-                        .progressViewStyle(.linear)
-                        .tint(.accentColor)
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 6)
                 }
-            }
+                .overlay(alignment: .bottom) {
+                    if let progress, progress > 0 {
+                        ProgressView(value: progress)
+                            .progressViewStyle(.linear)
+                            .tint(.accentColor)
+                            .padding(.horizontal, 8)
+                            .padding(.bottom, 6)
+                    }
+                }
             .clipShape(.rect(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(isHovering ? 0.35 : 0.08), lineWidth: 1))
             .shadow(color: .black.opacity(isHovering ? 0.35 : 0.15), radius: isHovering ? 14 : 6, y: isHovering ? 8 : 3)

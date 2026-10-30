@@ -42,6 +42,13 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: Stremio addon
             CFBundleURLSchemes: [stremio]
+          - CFBundleURLName: Magnet link
+            CFBundleURLSchemes: [magnet]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: BitTorrent File
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            CFBundleTypeExtensions: [torrent]
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
           NSAllowsLocalNetworking: true

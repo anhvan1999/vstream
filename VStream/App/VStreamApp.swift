@@ -32,6 +32,15 @@ struct VStreamApp: App {
                 Button("Refresh Addons") { Task { await app.addons.refreshManifests() } }
                     .keyboardShortcut("r", modifiers: .command)
             }
+            CommandGroup(replacing: .newItem) {
+                Button("Play Link…") { app.showPlayLink() }
+                    .keyboardShortcut("l", modifiers: .command)
+                Button("Open Torrent File…") {
+                    app.showPlayLink()
+                    app.isImportingTorrent = true
+                }
+                .keyboardShortcut("o", modifiers: .command)
+            }
             CommandGroup(after: .newItem) {
                 Button("Sync Now") { Task { await app.stremio.sync() } }
                     .keyboardShortcut("r", modifiers: [.command, .shift])

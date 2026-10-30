@@ -52,6 +52,47 @@ public enum TorrentError: Error, LocalizedError, Sendable {
     }
 }
 
+/// Where a torrent comes from: a magnet link or the bytes of a `.torrent` file.
+public enum TorrentSource: Sendable, Hashable {
+    case magnet(String)
+    case file(Data)
+}
+
+public struct TorrentFileEntry: Sendable, Hashable, Identifiable {
+    /// libtorrent's file index, as used by `fileIdx`.
+    public var index: Int
+    public var path: String
+    public var size: UInt64
+
+    public var id: Int { index }
+    public var name: String { (path as NSString).lastPathComponent }
+
+    public init(index: Int, path: String, size: UInt64) {
+        self.index = index
+        self.path = path
+        self.size = size
+    }
+
+    public var isVideo: Bool {
+        ["mkv", "mp4", "m4v", "avi", "mov", "webm", "ts", "m2ts", "wmv", "flv", "mpg", "mpeg", "ogv"]
+            .contains((path as NSString).pathExtension.lowercased())
+    }
+}
+
+public struct TorrentContents: Sendable, Hashable {
+    public var infoHash: String
+    public var name: String?
+    public var trackers: [String]
+    public var files: [TorrentFileEntry]
+
+    public init(infoHash: String, name: String?, trackers: [String], files: [TorrentFileEntry]) {
+        self.infoHash = infoHash
+        self.name = name
+        self.trackers = trackers
+        self.files = files
+    }
+}
+
 /// Owns the single libtorrent engine for the app and the one active stream.
 public actor TorrentStreamer {
     public static let shared = TorrentStreamer()
@@ -59,6 +100,8 @@ public actor TorrentStreamer {
     private var engine: NuvioEngine?
     private var settings = TorrentSettings()
     private var current: TorrentPlayback?
+    /// A torrent added only to list its files (magnet inspection), removed unless it is played.
+    private var inspected: String?
 
     public init() {}
 
@@ -79,11 +122,22 @@ public actor TorrentStreamer {
         filenameHint: String?,
         onPhase: @Sendable (TorrentPhase) -> Void = { _ in }
     ) async throws -> TorrentPlayback {
+        try await prepare(source: .magnet(magnet), fileIndex: fileIndex, filenameHint: filenameHint, onPhase: onPhase)
+    }
+
+    public func prepare(
+        source: TorrentSource,
+        fileIndex: Int?,
+        filenameHint: String?,
+        onPhase: @Sendable (TorrentPhase) -> Void = { _ in }
+    ) async throws -> TorrentPlayback {
         await stop()
         onPhase(.startingEngine)
         let engine = try await engineInstance()
         onPhase(.fetchingMetadata)
-        let torrentID = try await engine.addMagnet(magnet)
+        let torrentID = try await add(source, to: engine)
+        if inspected == torrentID { inspected = nil }
+        await removeInspected()
         do {
             let files = try await engine.files(for: torrentID)
             guard !files.isEmpty else { throw TorrentError.noFiles }
@@ -110,6 +164,39 @@ public actor TorrentStreamer {
             try? await engine.removeTorrent(torrentID)
             throw error
         }
+    }
+
+    /// Fetches a magnet's metadata to list its files. The torrent stays added (re-adding the same
+    /// hash is instant) until another one is inspected or played.
+    public func inspect(magnet: String) async throws -> TorrentContents {
+        let engine = try await engineInstance()
+        let torrentID = try await engine.addMagnet(magnet)
+        if inspected != torrentID {
+            await removeInspected()
+            if current?.torrentID != torrentID { inspected = torrentID }
+        }
+        let files = try await engine.files(for: torrentID)
+        let url = URL(string: magnet)
+        let name = url.flatMap { URLComponents(string: "x:" + $0.absoluteString.drop { $0 != "?" })?.queryItems?.first { $0.name == "dn" }?.value }
+        return TorrentContents(
+            infoHash: torrentID,
+            name: name,
+            trackers: [],
+            files: files.map { TorrentFileEntry(index: Int($0.index), path: $0.path, size: $0.size) }
+        )
+    }
+
+    private func add(_ source: TorrentSource, to engine: NuvioEngine) async throws -> String {
+        switch source {
+        case let .magnet(magnet): try await engine.addMagnet(magnet)
+        case let .file(data): try await engine.addTorrent(data)
+        }
+    }
+
+    private func removeInspected() async {
+        guard let inspected, let engine else { return }
+        self.inspected = nil
+        try? await engine.removeTorrent(inspected)
     }
 
     public func stop() async {

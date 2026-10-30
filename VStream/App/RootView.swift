@@ -9,7 +9,7 @@ struct RootView: View {
         NavigationSplitView {
             List(selection: $app.selection) {
                 Section {
-                    ForEach([SidebarItem.home, .search, .discover, .library]) { item in
+                    ForEach([SidebarItem.home, .search, .discover, .library, .playLink]) { item in
                         Label(item.title, systemImage: item.symbol).tag(item)
                     }
                 }
@@ -38,6 +38,13 @@ struct RootView: View {
         // Only the player goes full screen; the green button zooms this window instead.
         .fullScreenAllowed(false)
         .onChange(of: app.selection) { app.path = [] }
+        // Torrents, magnets and video files dropped on any page open in Play Link (which has
+        // its own drop target with a highlight).
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first, url.scheme == "magnet" || url.isFileURL else { return false }
+            app.handle(url: url)
+            return true
+        }
         #if DEBUG
         .task { debugAutoplay() }
         #endif
@@ -81,6 +88,7 @@ struct RootView: View {
         case .discover: DiscoverView()
         case .library: LibraryView()
         case .search: SearchView(query: app.searchText)
+        case .playLink: PlayLinkView()
         case .addons: AddonsView()
         }
     }

@@ -71,9 +71,12 @@ public struct StreamResolver: Sendable {
         self.torrent = torrent
     }
 
+    /// `torrentFile` is the `.torrent` the stream's info hash came from (Play Link); P2P then adds
+    /// the file itself instead of fetching metadata from peers.
     public func resolve(
         _ stream: AddonStream,
         context: EpisodeContext,
+        torrentFile: Data? = nil,
         onPhase: @escaping @Sendable (ResolvePhase) -> Void = { _ in }
     ) async throws -> ResolveOutcome {
         if let url = stream.url {
@@ -102,7 +105,7 @@ public struct StreamResolver: Sendable {
             }
 
             let playback = try await torrent.prepare(
-                magnet: magnet,
+                source: torrentFile.map(TorrentSource.file) ?? .magnet(magnet),
                 fileIndex: stream.fileIdx,
                 filenameHint: stream.behaviorHints.filename
             ) { phase in onPhase(.torrent(phase)) }

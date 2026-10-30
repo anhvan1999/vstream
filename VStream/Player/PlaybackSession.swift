@@ -39,10 +39,12 @@ final class PlaybackSession: Identifiable {
     @ObservationIgnored private var nextUpDismissed = false
 
     @ObservationIgnored private let recordsProgress: Bool
+    @ObservationIgnored private let torrentFile: Data?
 
-    init(app: AppModel, meta: MetaDetail, video: Video?, stream: AddonStream, recordsProgress: Bool = true) {
+    init(app: AppModel, meta: MetaDetail, video: Video?, stream: AddonStream, recordsProgress: Bool = true, torrentFile: Data? = nil) {
         self.app = app
         self.recordsProgress = recordsProgress
+        self.torrentFile = torrentFile
         self.meta = meta
         self.video = video
         self.stream = stream
@@ -84,11 +86,12 @@ final class PlaybackSession: Identifiable {
         let videoID = self.videoID
         let resume = app.library.resumePosition(itemID: meta.id, videoID: videoID) ?? 0
         let preferences = app.settings.settings
+        let torrentFile = self.torrentFile
         nextVideo = NextEpisode.after(videoID, in: meta)
 
         tasks.append(Task {
             do {
-                let outcome = try await resolver.resolve(stream, context: context) { phase in
+                let outcome = try await resolver.resolve(stream, context: context, torrentFile: torrentFile) { phase in
                     Task { @MainActor [weak self] in self?.stage = .resolving(Self.describe(phase)) }
                 }
                 switch outcome {
