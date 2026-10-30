@@ -10,7 +10,9 @@ struct AddonsView: View {
 
     var body: some View {
         @Bindable var app = app
-        List {
+        // Header and install field sit above the List: inside a List row, AppKit paints its own
+        // rectangular field background inside the rounded glass box.
+        VStack(alignment: .leading, spacing: 0) {
             ScreenHeader(title: "Addons", subtitle: "\(app.addons.addons.count) installed") {
                 Button("Browse Community Addons", systemImage: "globe") {
                     openURL(URL(string: "https://stremio-addons.com")!)
@@ -23,10 +25,8 @@ struct AddonsView: View {
                 .buttonStyle(.glass)
                 .disabled(app.addons.isRefreshing)
             }
-            .listRowInsets(EdgeInsets())
-            .listRowSeparator(.hidden)
 
-            Section {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 10) {
                     Image(systemName: "link").foregroundStyle(.secondary)
                     TextField("Paste an addon URL (https://… or stremio://…)", text: $input)
@@ -40,24 +40,29 @@ struct AddonsView: View {
                             .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }
-                .padding(10)
-                .glassEffect(.regular, in: .rect(cornerRadius: 14))
-                .listRowSeparator(.hidden)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .glassEffect(.regular, in: .capsule)
                 if let error {
                     Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red).font(.callout)
                 }
             }
+            .padding(.horizontal, 28)
+            .padding(.bottom, 8)
 
-            Section("Installed · drag to reorder (earlier addons answer first)") {
-                ForEach(app.addons.addons) { addon in
-                    AddonRow(addon: addon) {
-                        configure(addon)
+            List {
+                Section("Installed · drag to reorder (earlier addons answer first)") {
+                    ForEach(app.addons.addons) { addon in
+                        AddonRow(addon: addon) {
+                            configure(addon)
+                        }
                     }
+                    .onMove { app.addons.move(fromOffsets: $0, toOffset: $1) }
                 }
-                .onMove { app.addons.move(fromOffsets: $0, toOffset: $1) }
             }
+            .listStyle(.inset)
+            .scrollContentBackground(.hidden)
         }
-        .listStyle(.inset)
         .navigationTitle("Addons")
         .onAppear(perform: consumePendingURL)
         .onChange(of: app.pendingAddonURL) { consumePendingURL() }
