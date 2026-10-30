@@ -119,6 +119,8 @@ public final class PlayerModel {
     @ObservationIgnored private var surfaceReady = false
     @ObservationIgnored private var lastPublishedPosition: Double = -1
     @ObservationIgnored private var subtitleStyle = SubtitleStyle()
+    @ObservationIgnored private var lastLogLine: String?
+    @ObservationIgnored private var fileLoaded = false
     @ObservationIgnored public var onEnded: (() -> Void)?
 
     public init(hardwareDecoding: Bool = true) {
@@ -135,6 +137,8 @@ public final class PlayerModel {
 
     public func load(_ request: PlaybackRequest) {
         errorMessage = nil
+        lastLogLine = nil
+        fileLoaded = false
         isLoading = true
         isEnded = false
         position = request.startTime
@@ -229,6 +233,19 @@ public final class PlayerModel {
         controller.command(["sub-add", subtitle.url.absoluteString, select ? "select" : "auto", subtitle.title, subtitle.language])
     }
 
+    /// Adds subtitles that arrive after loading started (e.g. from addons).
+    public func addExternalSubtitles(_ subtitles: [ExternalSubtitle]) {
+        guard !subtitles.isEmpty else { return }
+        if pending != nil {
+            pending?.subtitles += subtitles
+            return
+        }
+        current?.subtitles += subtitles
+        guard fileLoaded else { return }
+        for subtitle in subtitles { addSubtitle(subtitle, select: false) }
+        selectPreferredSubtitle()
+    }
+
     public func setSubtitleDelay(_ seconds: Double) { controller.set("sub-delay", double: seconds) }
 
     public func apply(_ style: SubtitleStyle) {
@@ -269,7 +286,9 @@ public final class PlayerModel {
                         lastPublishedPosition = seconds
                         position = seconds
                     }
-                case let ("duration", .double(seconds)): duration = seconds
+                case let ("duration", .double(seconds)):
+                    duration = seconds
+                    if seconds > 0 { isLoading = false }
                 case let ("demuxer-cache-time", .double(seconds)): cachedUntil = seconds
                 case let ("speed", .double(value)): speed = value
                 case let ("volume", .double(value)): volume = value
@@ -285,6 +304,7 @@ public final class PlayerModel {
                 default: break
                 }
             case .fileLoaded:
+                fileLoaded = true
                 isLoading = false
                 errorMessage = nil
                 tracksChanged = true
@@ -298,10 +318,10 @@ public final class PlayerModel {
             case let .endFile(error):
                 if let error {
                     isLoading = false
-                    errorMessage = error
+                    errorMessage = [error, lastLogLine].compactMap { $0 }.joined(separator: ": ")
                 }
             case let .log(message):
-                if isLoading, errorMessage == nil, !message.isEmpty { errorMessage = message }
+                if !message.isEmpty { lastLogLine = message }
             }
         }
         if tracksChanged { reloadTracks() }

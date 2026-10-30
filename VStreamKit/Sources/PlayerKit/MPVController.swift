@@ -138,7 +138,7 @@ final class MPVController: @unchecked Sendable {
         for (name, value) in options {
             mpv_set_option_string(mpv, name, value)
         }
-        mpv_request_log_messages(mpv, "error")
+        mpv_request_log_messages(mpv, ProcessInfo.processInfo.environment["VSTREAM_MPV_LOG"] ?? "error")
 
         guard mpv_initialize(mpv) >= 0 else {
             mpv_terminate_destroy(mpv)
@@ -251,7 +251,11 @@ final class MPVController: @unchecked Sendable {
                 case MPV_EVENT_LOG_MESSAGE:
                     if let message = event.pointee.data?.assumingMemoryBound(to: mpv_event_log_message.self).pointee,
                        let text = message.text {
-                        events.append(.log(String(cString: text).trimmingCharacters(in: .whitespacesAndNewlines)))
+                        let line = String(cString: text).trimmingCharacters(in: .whitespacesAndNewlines)
+                        if ProcessInfo.processInfo.environment["VSTREAM_MPV_LOG"] != nil, let prefix = message.prefix {
+                            FileHandle.standardError.write(Data("[mpv/\(String(cString: prefix))] \(line)\n".utf8))
+                        }
+                        events.append(.log(line))
                     }
                 case MPV_EVENT_SHUTDOWN:
                     return
