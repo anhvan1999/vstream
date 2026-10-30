@@ -55,63 +55,89 @@ struct DetailView: View {
 
     @ViewBuilder
     private func content(_ meta: MetaDetail) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                header(meta)
-                if meta.isSeriesLike {
-                    episodes(meta)
-                        .padding(.horizontal, 36)
-                        .padding(.top, 24)
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Movies fill exactly one screen; series leave the episode list peeking in.
+                    header(meta)
+                        .frame(minHeight: proxy.size.height * (meta.isSeriesLike ? 0.78 : 1), alignment: .bottomLeading)
+                    if meta.isSeriesLike {
+                        episodes(meta)
+                            .padding(.horizontal, 36)
+                            .padding(.top, 8)
+                            .padding(.bottom, 40)
+                    }
                 }
             }
-            .padding(.bottom, 40)
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .background { backdrop(meta) }
         }
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .ignoresSafeArea(edges: .top)
     }
 
-    private func header(_ meta: MetaDetail) -> some View {
-        ZStack(alignment: .bottomLeading) {
-            RemoteImage(url: meta.preview.background ?? meta.preview.poster)
-                .frame(height: 520)
-                .frame(maxWidth: .infinity)
-                .clipped()
-                .backgroundExtensionEffect()
-                .overlay {
-                    LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.45), location: 0.55), .init(color: Color(nsColor: .windowBackgroundColor), location: 1)], startPoint: .top, endPoint: .bottom)
-                }
-
-            VStack(alignment: .leading, spacing: 14) {
-                if let logo = meta.preview.logo {
-                    RemoteImage(url: logo, contentMode: .fit)
-                        .frame(maxWidth: 420, maxHeight: 130, alignment: .leading)
-                } else {
-                    Text(meta.name).font(.system(size: 40, weight: .bold))
-                }
-                HStack(spacing: 12) {
-                    if let release = meta.preview.releaseInfo { Text(release) }
-                    if let runtime = meta.preview.runtime { Text(runtime) }
-                    if let rating = meta.preview.imdbRating { Label(rating, systemImage: "star.fill").foregroundStyle(.yellow) }
-                    if !meta.preview.genres.isEmpty { Text(meta.preview.genres.prefix(3).joined(separator: " · ")) }
-                }
-                .font(.callout.weight(.medium))
-                if let description = meta.preview.description {
-                    Text(description)
-                        .lineLimit(4)
-                        .frame(maxWidth: 640, alignment: .leading)
-                        .foregroundStyle(.white.opacity(0.88))
-                }
-                if !meta.cast.isEmpty {
-                    Text("Starring \(meta.cast.prefix(4).joined(separator: ", "))")
-                        .font(.callout)
-                        .foregroundStyle(.white.opacity(0.7))
-                }
-                actions(meta)
+    /// Full-page artwork pinned behind the scrolling content.
+    private func backdrop(_ meta: MetaDetail) -> some View {
+        Color.clear
+            .overlay { RemoteImage(url: meta.preview.background ?? meta.preview.poster) }
+            .clipped()
+            .overlay {
+                // Left-side shade keeps the title and description readable on bright artwork.
+                LinearGradient(colors: [.black.opacity(0.75), .black.opacity(0.35), .clear], startPoint: .leading, endPoint: UnitPoint(x: 0.75, y: 0.5))
             }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 36)
-            .padding(.bottom, 28)
+            .overlay {
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .black.opacity(0.25), location: 0.45),
+                        .init(color: Color(nsColor: .windowBackgroundColor).opacity(meta.isSeriesLike ? 0.92 : 0.8), location: 1),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            .backgroundExtensionEffect()
+            // Vertical only: the leading safe area is the sidebar, which the extension effect covers.
+            .ignoresSafeArea(edges: .vertical)
+    }
+
+    private func header(_ meta: MetaDetail) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let logo = meta.preview.logo {
+                RemoteImage(url: logo, contentMode: .fit)
+                    .frame(maxWidth: 420, maxHeight: 130, alignment: .leading)
+            } else {
+                Text(meta.name).font(.system(size: 40, weight: .bold))
+            }
+            HStack(spacing: 12) {
+                if let release = meta.preview.releaseInfo { Text(release) }
+                if let runtime = meta.preview.runtime { Text(runtime) }
+                if let rating = meta.preview.imdbRating { Label(rating, systemImage: "star.fill").foregroundStyle(.yellow) }
+                if !meta.preview.genres.isEmpty { Text(meta.preview.genres.prefix(3).joined(separator: " · ")) }
+            }
+            .font(.callout.weight(.medium))
+            if let description = meta.preview.description {
+                Text(description)
+                    .lineLimit(5)
+                    .frame(maxWidth: 640, alignment: .leading)
+                    .foregroundStyle(.white.opacity(0.88))
+            }
+            if !meta.cast.isEmpty {
+                Text("Starring \(meta.cast.prefix(4).joined(separator: ", "))")
+                    .font(.callout)
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+            if !meta.director.isEmpty {
+                Text("Directed by \(meta.director.prefix(2).joined(separator: ", "))")
+                    .font(.callout)
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+            actions(meta)
+                .padding(.top, 6)
         }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 36)
+        .padding(.bottom, 36)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .environment(\.colorScheme, .dark)
     }
 
@@ -187,6 +213,7 @@ struct DetailView: View {
                         Text(number == 0 ? "Specials" : "Season \(number)").tag(Optional(number))
                     }
                 }
+                .labelsHidden()
                 .fixedSize()
             }
             LazyVStack(spacing: 10) {

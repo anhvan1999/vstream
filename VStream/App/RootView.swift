@@ -54,6 +54,13 @@ struct RootView: View {
 
     /// `VSTREAM_DEBUG_PLAY=<url|magnet>` opens the player directly, for end-to-end checks.
     private func debugAutoplay() {
+        // `VSTREAM_DEBUG_OPEN=<type>:<id>` opens a detail page, for screenshots.
+        if let route = ProcessInfo.processInfo.environment["VSTREAM_DEBUG_OPEN"]?.split(separator: ":", maxSplits: 1), route.count == 2 {
+            Task {
+                try? await Task.sleep(for: .seconds(1))
+                app.path = [MetaRoute(type: String(route[0]), id: String(route[1]))]
+            }
+        }
         guard let value = ProcessInfo.processInfo.environment["VSTREAM_DEBUG_PLAY"], let url = URL(string: value) else { return }
         let stream: AddonStream
         if url.scheme == "magnet", let hash = Magnet.infoHash(from: url) {
