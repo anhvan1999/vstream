@@ -33,10 +33,10 @@ struct RootView: View {
         }
         .toolbar(removing: .sidebarToggle)
         // Windowed, the toolbar stays (it carries the traffic lights) but is invisible except on
-        // Search, where it hosts the search field. In full screen macOS draws it as an opaque strip,
-        // so it is removed everywhere and Search shows its field in the content instead.
+        // Search, where it hosts the search field. In full screen it slides in only when the pointer
+        // reaches the top edge, like other native apps, and Search shows its field in the content.
         .toolbarBackgroundVisibility(showsToolbar ? .automatic : .hidden, for: .windowToolbar)
-        .toolbar(isFullScreen ? .hidden : .visible, for: .windowToolbar)
+        .windowToolbarFullScreenVisibility(.onHover)
         .toolbar(removing: .title)
         .trackingFullScreen($isFullScreen)
         .environment(\.isFullScreen, isFullScreen)

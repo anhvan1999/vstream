@@ -19,6 +19,7 @@ struct PlayerWindow: View {
         }
         .frame(minWidth: 640, minHeight: 360)
         .background(.black)
+        .windowToolbarFullScreenVisibility(.onHover)
         .onDisappear { app.closePlayback() }
     }
 }
