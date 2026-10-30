@@ -121,6 +121,18 @@ final class MPVController: @unchecked Sendable {
             ("keep-open", "yes"),
             ("idle", "yes"),
             ("ytdl", "no"),
+            // Built-in Lua scripts (OSC, stats, console, select, …) are unused; they also query the
+            // audio device list, whose CoreAudio hotplug callback crashed libmpv after teardown.
+            ("osc", "no"),
+            ("load-scripts", "no"),
+            ("load-stats-overlay", "no"),
+            ("load-console", "no"),
+            ("load-select", "no"),
+            ("load-positioning", "no"),
+            ("load-commands", "no"),
+            ("load-context-menu", "no"),
+            ("load-auto-profiles", "no"),
+            ("load-osd-console", "no"),
             ("input-default-bindings", "no"),
             ("input-media-keys", "no"),
             ("audio-channels", "auto"),
