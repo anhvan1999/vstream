@@ -3,6 +3,7 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var app
+    @State private var isFullScreen = false
 
     var body: some View {
         @Bindable var app = app
@@ -31,10 +32,14 @@ struct RootView: View {
             }
         }
         .toolbar(removing: .sidebarToggle)
-        // The toolbar is invisible except on Search, where it hosts the search field and picks up
-        // glass once results scroll beneath it. (Hiding it outright also removes the traffic lights.)
+        // Windowed, the toolbar stays (it carries the traffic lights) but is invisible except on
+        // Search, where it hosts the search field. In full screen macOS draws it as an opaque strip,
+        // so it is removed everywhere and Search shows its field in the content instead.
         .toolbarBackgroundVisibility(showsToolbar ? .automatic : .hidden, for: .windowToolbar)
+        .toolbar(isFullScreen ? .hidden : .visible, for: .windowToolbar)
         .toolbar(removing: .title)
+        .trackingFullScreen($isFullScreen)
+        .environment(\.isFullScreen, isFullScreen)
         .onChange(of: app.selection) { app.path = [] }
         #if DEBUG
         .task { debugAutoplay() }

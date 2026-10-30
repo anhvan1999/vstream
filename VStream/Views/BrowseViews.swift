@@ -71,13 +71,32 @@ struct DiscoverView: View {
 
 struct SearchView: View {
     @Environment(AppModel.self) private var app
+    @Environment(\.isFullScreen) private var isFullScreen
     var query: String
     @State private var results: [SearchResultGroup] = []
     @State private var isSearching = false
-    @FocusState private var fieldFocused: Bool
 
     var body: some View {
-        @Bindable var app = app
+        Group {
+            if isFullScreen {
+                content.safeAreaInset(edge: .top, spacing: 0) { InlineSearchField() }
+            } else {
+                content.modifier(ToolbarSearch())
+            }
+        }
+        .navigationTitle("Search")
+        .task(id: query) {
+            let trimmed = query.trimmingCharacters(in: .whitespaces)
+            guard trimmed.count >= 2 else { results = []; return }
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            isSearching = true
+            results = await app.content.search(trimmed, addons: app.addons.enabled)
+            isSearching = false
+        }
+    }
+
+    private var content: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 28) {
                 ForEach(results) { group in
@@ -97,10 +116,6 @@ struct SearchView: View {
         }
         // The toolbar stays clear until content scrolls beneath it, then picks up its glass.
         .scrollEdgeEffectStyle(.soft, for: .top)
-        .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
-        .searchable(text: $app.searchText, placement: .toolbar, prompt: "Movies, shows, channels")
-        .searchFocused($fieldFocused)
-        .onAppear { fieldFocused = true }
         .overlay {
             if isSearching && results.isEmpty {
                 ProgressView("Searching…")
@@ -112,16 +127,52 @@ struct SearchView: View {
                 )
             }
         }
-        .navigationTitle("Search")
-        .task(id: query) {
-            let trimmed = query.trimmingCharacters(in: .whitespaces)
-            guard trimmed.count >= 2 else { results = []; return }
-            try? await Task.sleep(for: .milliseconds(250))
-            guard !Task.isCancelled else { return }
-            isSearching = true
-            results = await app.content.search(trimmed, addons: app.addons.enabled)
-            isSearching = false
+    }
+}
+
+/// Windowed: the search field lives in the (otherwise invisible) toolbar.
+private struct ToolbarSearch: ViewModifier {
+    @Environment(AppModel.self) private var app
+    @FocusState private var focused: Bool
+
+    func body(content: Content) -> some View {
+        @Bindable var app = app
+        content
+            .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
+            .searchable(text: $app.searchText, placement: .toolbar, prompt: "Movies, shows, channels")
+            .searchFocused($focused)
+            .onAppear { focused = true }
+    }
+}
+
+/// Full screen: no toolbar, so the field floats on glass at the top of the content.
+private struct InlineSearchField: View {
+    @Environment(AppModel.self) private var app
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        @Bindable var app = app
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField("Movies, shows, channels", text: $app.searchText)
+                .textFieldStyle(.plain)
+                .focused($focused)
+            if !app.searchText.isEmpty {
+                Button { app.searchText = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
         }
+        .font(.title3)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: 520)
+        .glassEffect(.regular, in: .capsule)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity)
+        .onAppear { focused = true }
     }
 }
 
