@@ -19,7 +19,7 @@ struct PlayerWindow: View {
         }
         .frame(minWidth: 640, minHeight: 360)
         .background(.black)
-        .windowToolbarFullScreenVisibility(.onHover)
+        // No toolbar here: leave the full-screen title bar to AppKit so its buttons stay usable.
         .fullScreenAllowed(true)
         .onDisappear { app.closePlayback() }
     }
