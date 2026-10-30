@@ -165,7 +165,7 @@ public struct MetaDetail: Codable, Sendable, Hashable, Identifiable {
         if writer.isEmpty { writer = links.filter { $0.category.lowercased() == "writers" }.map(\.name) }
         trailers = container.lossyArray(.trailers)
         if trailers.isEmpty {
-            trailers = container.lossyArray(.trailerStreams, of: Stream.self).compactMap { stream in
+            trailers = container.lossyArray(.trailerStreams, of: AddonStream.self).compactMap { stream in
                 stream.ytId.map { Trailer(source: $0, type: "Trailer") }
             }
         }
@@ -211,7 +211,7 @@ public struct Video: Codable, Sendable, Hashable, Identifiable, Comparable {
     public var episode: Int?
     public var thumbnail: URL?
     public var overview: String?
-    public var streams: [Stream]
+    public var streams: [AddonStream]
 
     public init(
         id: String,
@@ -221,7 +221,7 @@ public struct Video: Codable, Sendable, Hashable, Identifiable, Comparable {
         episode: Int? = nil,
         thumbnail: URL? = nil,
         overview: String? = nil,
-        streams: [Stream] = []
+        streams: [AddonStream] = []
     ) {
         self.id = id
         self.title = title

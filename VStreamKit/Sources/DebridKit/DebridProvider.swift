@@ -61,6 +61,12 @@ public struct DebridLink: Sendable, Hashable {
     public var url: URL
     public var filename: String?
     public var size: Int64?
+
+    public init(url: URL, filename: String?, size: Int64?) {
+        self.url = url
+        self.filename = filename
+        self.size = size
+    }
 }
 
 public enum DebridError: Error, LocalizedError, Sendable {

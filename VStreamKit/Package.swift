@@ -33,7 +33,7 @@ let package = Package(
         ),
         .target(
             name: "VStreamCore",
-            dependencies: ["AddonKit", "StremioAPI", "TraktKit", "DebridKit", "TorrentKit"]
+            dependencies: ["AddonKit", "StremioAPI", "TraktKit", "DebridKit", "TorrentKit", "PlayerKit"]
         ),
         .testTarget(
             name: "AddonKitTests",
@@ -42,7 +42,7 @@ let package = Package(
         ),
         .testTarget(
             name: "VStreamCoreTests",
-            dependencies: ["VStreamCore"]
+            dependencies: ["VStreamCore", "DebridKit", "AddonKit", "StremioAPI"]
         ),
     ]
 )

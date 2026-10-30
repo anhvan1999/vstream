@@ -73,7 +73,7 @@ public actor AddonClient {
         return try decode(MetaResponse.self, from: data, url: url).meta
     }
 
-    public func streams(_ addon: AddonDescriptor, type: String, id: String) async throws -> [Stream] {
+    public func streams(_ addon: AddonDescriptor, type: String, id: String) async throws -> [AddonStream] {
         let url = try resourceURL(addon, "stream", type: type, id: id)
         let data = try await fetch(url, timeout: 30)
         return try decode(StreamsResponse.self, from: data, url: url).streams.filter(\.isPlayable)
@@ -151,7 +151,7 @@ struct MetasResponse: Decodable {
 }
 
 struct StreamsResponse: Decodable {
-    let streams: [Stream]
+    let streams: [AddonStream]
 
     enum CodingKeys: String, CodingKey { case streams }
 

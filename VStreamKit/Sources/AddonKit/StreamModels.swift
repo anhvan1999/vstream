@@ -1,6 +1,6 @@
 import Foundation
 
-public struct Stream: Codable, Sendable, Hashable {
+public struct AddonStream: Codable, Sendable, Hashable {
     public var url: URL?
     public var ytId: String?
     public var infoHash: String?

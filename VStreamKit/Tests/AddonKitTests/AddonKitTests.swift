@@ -136,7 +136,7 @@ private func fixture(_ name: String) throws -> Data {
 
     @Test func magnetInURLBecomesTorrent() throws {
         let json = #"{"url":"magnet:?xt=urn:btih:ABCDEF0123456789ABCDEF0123456789ABCDEF01&tr=udp%3A%2F%2Ft.example%3A80","name":"x"}"#
-        let stream = try JSONDecoder().decode(Stream.self, from: Data(json.utf8))
+        let stream = try JSONDecoder().decode(AddonStream.self, from: Data(json.utf8))
         #expect(stream.url == nil)
         #expect(stream.infoHash == "abcdef0123456789abcdef0123456789abcdef01")
         #expect(stream.trackers == ["udp://t.example:80"])
