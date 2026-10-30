@@ -40,6 +40,7 @@ struct DetailView: View {
     private func load() async {
         do {
             let detail = try await app.content.meta(type: route.type, id: route.id, addons: app.addons.enabled)
+            app.library.registerVideos(of: detail)
             meta = detail
             let resume = app.library.items[detail.id]?.state.videoId
             let resumeSeason = resume.flatMap { id in detail.videos.first { $0.id == id }?.season }

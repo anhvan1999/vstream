@@ -2,6 +2,7 @@ import AddonKit
 import AppKit
 import Foundation
 import Observation
+import OSLog
 import PlayerKit
 import TorrentKit
 import VStreamCore
@@ -48,6 +49,7 @@ final class PlaybackSession: Identifiable {
         player = PlayerModel(hardwareDecoding: app.settings.settings.hardwareDecoding, bufferMB: app.settings.settings.streamBufferMB)
         player.apply(app.settings.settings.subtitleStyle)
         player.onEnded = { [weak self] in self?.handleEnded() }
+        app.library.registerVideos(of: meta)
         start()
     }
 
@@ -62,8 +64,17 @@ final class PlaybackSession: Identifiable {
 
     // MARK: Lifecycle
 
+    private static let log = Logger(subsystem: "com.vstream.app", category: "playback")
+
     private func start() {
         guard let app else { return }
+        // Diagnostics only: no URLs or keys.
+        Self.log.info("""
+        play \(self.meta.id, privacy: .public) video=\(self.videoID, privacy: .public) \
+        stream name=\((self.stream.name ?? "-").replacingOccurrences(of: "\n", with: " "), privacy: .public) \
+        hasURL=\(self.stream.url != nil, privacy: .public) host=\(self.stream.url?.host ?? "-", privacy: .public) \
+        infoHash=\(self.stream.infoHash != nil, privacy: .public) fileIdx=\(self.stream.fileIdx ?? -1, privacy: .public)
+        """)
         let resolver = app.resolver
         let stream = self.stream
         let context = EpisodeContext(videoID: videoID)
@@ -85,6 +96,7 @@ final class PlaybackSession: Identifiable {
                     NSWorkspace.shared.open(url)
                     self.stage = .failed("Opened in your browser")
                 case let .play(resolved):
+                    Self.log.info("resolved source=\(String(describing: resolved.source), privacy: .public) host=\(resolved.url.host ?? "-", privacy: .public)")
                     self.source = resolved.source
                     self.resolvedURL = resolved.url
                     self.player.load(PlaybackRequest(

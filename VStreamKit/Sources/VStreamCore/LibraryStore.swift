@@ -20,6 +20,8 @@ public final class LibraryStore {
     /// Watched video ids per item (episodes, or the meta id for movies).
     public private(set) var watched: [String: Set<String>] = [:]
     @ObservationIgnored public private(set) var dirty: Set<String> = []
+    /// Episode order per series, in Stremio's bitfield order; known once a meta has been loaded.
+    @ObservationIgnored private var videoOrder: [String: [String]] = [:]
 
     /// Hooks for sync layers: progress (for scrobbling) and explicit watched/library changes.
     @ObservationIgnored public var onWatched: ((LibraryItem, String) -> Void)?
@@ -84,6 +86,30 @@ public final class LibraryStore {
         .map { $0 }
     }
 
+    // MARK: Stremio watched bitfield
+
+    /// Learns a series' episode list, then reads Stremio's per-episode watched marks for it.
+    public func registerVideos(of meta: MetaDetail) {
+        guard meta.isSeriesLike else { return }
+        let order = WatchedBitfield.orderedVideoIDs(meta.videos)
+        videoOrder[meta.id] = order
+        importStremioWatched(itemID: meta.id)
+    }
+
+    private func importStremioWatched(itemID: String) {
+        guard let serialized = items[itemID]?.state.watched, let order = videoOrder[itemID] else { return }
+        let remote = WatchedBitfield.decode(serialized, videoIDs: order)
+        guard !remote.isSubset(of: watched[itemID] ?? []) else { return }
+        watched[itemID, default: []].formUnion(remote)
+        persist()
+    }
+
+    /// Writes local marks back into the item so Stremio sees them after the next sync.
+    private func exportStremioWatched(_ item: inout LibraryItem) {
+        guard let order = videoOrder[item.id], let encoded = WatchedBitfield.encode(watched: watched[item.id] ?? [], videoIDs: order) else { return }
+        item.state.watched = encoded
+    }
+
     // MARK: Mutations
 
     public func toggleLibrary(_ meta: MetaPreview) {
@@ -140,6 +166,7 @@ public final class LibraryStore {
         } else {
             watched[item.id]?.remove(videoID)
             if meta.type == "movie" { item.state.flaggedWatched = 0 }
+            exportStremioWatched(&item)
         }
         commit(item)
     }
@@ -160,6 +187,9 @@ public final class LibraryStore {
             dirty.remove(item.id)
             if item.state.flaggedWatched > 0 || item.state.timesWatched > 0, item.type == "movie" {
                 watched[item.id, default: []].insert(item.id)
+            }
+            if let serialized = item.state.watched, let order = videoOrder[item.id] {
+                watched[item.id, default: []].formUnion(WatchedBitfield.decode(serialized, videoIDs: order))
             }
         }
         persist()
@@ -197,6 +227,7 @@ public final class LibraryStore {
             item.state.duration = 0
             item.state.timeWatched = 0
         }
+        exportStremioWatched(&item)
         if !alreadyWatched { onWatched?(item, videoID) }
     }
 
