@@ -126,8 +126,23 @@ public struct StreamPresentation: Sendable, Hashable {
     public var size: String?
     public var seeders: String?
     public var source: String?
+    /// The addon's own label, e.g. "[TB+] Torrentio · 4k DV" (from the multi-line `name`).
+    public var sourceLabel: String?
+    /// File or release name to headline the stream.
+    public var title: String
+    /// Leftover description lines such as "Dubbed / Dual Audio / 🇬🇧".
+    public var extras: String?
 
     public init(_ stream: AddonStream) {
+        let nameLines = (stream.name ?? "").split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        sourceLabel = nameLines.isEmpty ? nil : nameLines.joined(separator: " · ")
+        let detailLines = (stream.details ?? "").split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let headline = stream.behaviorHints.filename ?? detailLines.first ?? nameLines.first ?? "Stream"
+        title = headline
+        let metaMarkers = ["👤", "💾", "⚙️"]
+        extras = detailLines.dropFirst()
+            .filter { line in !metaMarkers.contains { line.contains($0) } && line != headline }
+            .last
         let text = [stream.name, stream.details].compactMap { $0 }.joined(separator: "\n")
         let lower = text.lowercased()
         quality = ["2160p", "4k", "1440p", "1080p", "720p", "480p"].first { lower.contains($0) }.map { $0 == "4k" ? "2160p" : $0 }

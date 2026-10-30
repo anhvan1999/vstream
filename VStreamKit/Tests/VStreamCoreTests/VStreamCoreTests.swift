@@ -96,6 +96,20 @@ private struct MockDebrid: DebridProvider {
         #expect(!presentation.tags.contains("HDR"))
     }
 
+    @Test func labelsTitleAndExtras() {
+        let stream = AddonStream(
+            name: "[TB+] Torrentio\n4k",
+            title: "Cyberpunk.Edgerunners.S01E03.2160p.mkv\n👤 51 💾 2.23 GB ⚙️ Rutracker\nDubbed / Dual Audio"
+        )
+        let presentation = StreamPresentation(stream)
+        #expect(presentation.sourceLabel == "[TB+] Torrentio · 4k")
+        #expect(presentation.title == "Cyberpunk.Edgerunners.S01E03.2160p.mkv")
+        #expect(presentation.extras == "Dubbed / Dual Audio")
+        let named = StreamPresentation(AddonStream(name: "Direct", behaviorHints: .init(filename: "movie.mp4")))
+        #expect(named.title == "movie.mp4")
+        #expect(named.extras == nil)
+    }
+
     @Test func traktItemMapping() {
         #expect(TraktAccount.traktItem(type: "movie", videoID: "tt0816692") == .movie(imdb: "tt0816692"))
         #expect(TraktAccount.traktItem(type: "series", videoID: "tt0903747:1:2") == .episode(showIMDB: "tt0903747", season: 1, episode: 2))

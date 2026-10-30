@@ -29,7 +29,7 @@ struct DetailView: View {
         .navigationTitle(meta?.name ?? route.preview?.name ?? "")
         .inspector(isPresented: Binding(get: { streamTarget != nil }, set: { if !$0 { streamTarget = nil } })) {
             if let meta, let target = streamTarget {
-                StreamListView(meta: meta, video: target.video, videoID: target.id)
+                StreamListView(meta: meta, video: target.video, videoID: target.id) { streamTarget = nil }
                     .inspectorColumnWidth(min: 360, ideal: 420, max: 560)
                     .id(target)
             }
