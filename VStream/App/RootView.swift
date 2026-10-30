@@ -116,6 +116,20 @@ struct RootView: View {
                     detailStack(content(for: item))
                 }
             }
+            if horizontalSizeClass == .compact {
+                Tab(SidebarItem.search.title, systemImage: SidebarItem.search.symbol, value: Optional(SidebarItem.search), role: .search) {
+                    detailStack(content(for: .search))
+                }
+            } else {
+                // iPad: a plain tab (🔍 in the strip) whose page shows the field under the strip,
+                // like the Apple TV app; the search role would turn the strip itself into a field.
+                Tab(value: Optional(SidebarItem.search)) {
+                    detailStack(content(for: .search))
+                } label: {
+                    Label(SidebarItem.search.title, systemImage: SidebarItem.search.symbol)
+                        .labelStyle(.iconOnly)
+                }
+            }
             // iPad only: four tabs plus Search fill an iPhone tab bar (more would add "More"), so
             // there Addons is reached through Settings (⚙︎ on Library).
             if horizontalSizeClass != .compact {
@@ -124,9 +138,6 @@ struct RootView: View {
                         detailStack(content(for: .addons))
                     }
                 }
-            }
-            Tab(SidebarItem.search.title, systemImage: SidebarItem.search.symbol, value: Optional(SidebarItem.search), role: .search) {
-                detailStack(content(for: .search))
             }
         }
         .tabViewStyle(.sidebarAdaptable)
@@ -147,6 +158,9 @@ struct RootView: View {
                     DetailView(route: route)
                         #if os(iOS)
                         .toolbar(.hidden, for: .navigationBar)
+                        // No bar backgrounds behind the floating tab strip: the artwork runs up
+                        // under it.
+                        .toolbarBackgroundVisibility(.hidden, for: .navigationBar, .tabBar)
                         #endif
                 }
         }

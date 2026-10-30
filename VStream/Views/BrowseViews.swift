@@ -132,6 +132,9 @@ struct SearchView: View {
 /// The search field lives in the (otherwise invisible) toolbar.
 private struct ToolbarSearch: ViewModifier {
     @Environment(AppModel.self) private var app
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
     @FocusState private var focused: Bool
 
     func body(content: Content) -> some View {
@@ -143,11 +146,20 @@ private struct ToolbarSearch: ViewModifier {
             #if os(macOS)
             .searchable(text: $app.searchText, placement: .toolbarPrincipal, prompt: "Movies, shows, channels")
             #else
-            // The Search tab's own field (bottom bar on iPhone, top of the page on iPad).
-            .searchable(text: $app.searchText, prompt: "Movies, shows, channels")
+            // iPad: always a field under the tab strip, like the Apple TV app, rather than a
+            // collapsed button. iPhone: the Search tab's own field.
+            .searchable(
+                text: $app.searchText,
+                placement: horizontalSizeClass == .regular ? .navigationBarDrawer(displayMode: .always) : .automatic,
+                prompt: "Movies, shows, channels"
+            )
             #endif
             .searchFocused($focused)
+            // The Mac focuses the field right away; iPadOS would hide the tab strip while the
+            // field is focused, so there it waits for a tap.
+            #if os(macOS)
             .onAppear { focused = true }
+            #endif
     }
 }
 

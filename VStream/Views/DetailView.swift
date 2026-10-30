@@ -27,14 +27,31 @@ struct DetailView: View {
             }
         }
         .navigationTitle(meta?.name ?? route.preview?.name ?? "")
-        .inspector(isPresented: Binding(get: { streamTarget != nil }, set: { if !$0 { streamTarget = nil } })) {
+        #if os(macOS)
+        .inspector(isPresented: showsStreams) {
             if let meta, let target = streamTarget {
                 StreamListView(meta: meta, video: target.video, videoID: target.id) { streamTarget = nil }
                     .inspectorColumnWidth(min: 360, ideal: 420, max: 560)
                     .id(target)
             }
         }
+        #else
+        // A sheet on iPhone/iPad: an inspector there wraps the page in a container that keeps the
+        // bar area, leaving a band above the artwork.
+        .sheet(isPresented: showsStreams) {
+            if let meta, let target = streamTarget {
+                StreamListView(meta: meta, video: target.video, videoID: target.id) { streamTarget = nil }
+                    .presentationDetents([.medium, .large])
+                    .presentationBackground(.regularMaterial)
+                    .id(target)
+            }
+        }
+        #endif
         .task(id: route) { await load() }
+    }
+
+    private var showsStreams: Binding<Bool> {
+        Binding(get: { streamTarget != nil }, set: { if !$0 { streamTarget = nil } })
     }
 
     private func load() async {
@@ -71,9 +88,16 @@ struct DetailView: View {
                 }
             }
             .scrollEdgeEffectStyle(.soft, for: .top)
-            .background { backdrop(meta) }
+            #if os(iOS)
+            // The artwork runs up under the floating tab bar; the soft edge would paint a pale
+            // band there instead.
+            .scrollEdgeEffectHidden(true, for: .top)
+            #endif
         }
         .ignoresSafeArea(edges: .top)
+        // Outermost, so the artwork also fills the bar area on iPad, where the scroll view is laid
+        // out below the tab strip.
+        .background { backdrop(meta) }
     }
 
     /// Full-page artwork pinned behind the scrolling content.

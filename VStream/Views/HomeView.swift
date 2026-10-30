@@ -45,6 +45,10 @@ struct HomeView: View {
             .padding(.bottom, 40)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
+        #if os(iOS)
+        // With the hero, the artwork runs up under the floating tab bar (no pale edge band).
+        .scrollEdgeEffectHidden(!featured.isEmpty, for: .top)
+        #endif
         .ignoresSafeArea(edges: featured.isEmpty ? [] : .top)
         .navigationTitle("Home")
     }
