@@ -26,7 +26,13 @@ struct RootView: View {
                         DetailView(route: route)
                     }
             }
+            .toolbar(.hidden, for: .windowToolbar)
+            .overlay(alignment: .topLeading) {
+                if !app.path.isEmpty { BackButton() }
+            }
         }
+        .toolbar(removing: .sidebarToggle)
+        .toolbar(.hidden, for: .windowToolbar)
         .searchable(text: $app.searchText, placement: .sidebar, prompt: "Movies, shows, channels")
         .onSubmit(of: .search) {
             app.path = []

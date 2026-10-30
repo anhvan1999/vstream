@@ -17,15 +17,14 @@ struct DiscoverView: View {
     var body: some View {
         Group {
             if let row = selectedRow {
-                CatalogGridView(row: row, genre: genre)
+                CatalogGridView(row: row, genre: genre, showsHeader: false)
                     .id("\(row.id)|\(genre ?? "")")
             } else {
                 EmptyStateView(title: "Nothing to discover", symbol: "safari", message: "Your addons don't provide browsable catalogs.")
             }
         }
-        .navigationTitle("Discover")
-        .toolbar {
-            ToolbarItemGroup {
+        .safeAreaInset(edge: .top, spacing: 0) {
+            ScreenHeader(title: "Discover") {
                 Picker("Type", selection: $type) {
                     ForEach(types, id: \.self) { Text($0.capitalized).tag($0) }
                 }
@@ -50,6 +49,7 @@ struct DiscoverView: View {
                 }
             }
         }
+        .navigationTitle("Discover")
         .onChange(of: type) {
             rowID = nil
             genre = nil
@@ -88,6 +88,10 @@ struct SearchView: View {
                 }
             }
             .padding(.vertical, 20)
+        }
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            ScreenHeader(title: query.isEmpty ? "Search" : "Results for “\(query)”")
         }
         .overlay {
             if isSearching && results.isEmpty {
@@ -152,19 +156,21 @@ struct LibraryView: View {
                 EmptyStateView(title: "Your library is empty", symbol: "books.vertical", message: "Add movies and shows from their detail page.")
             }
         }
+        .scrollEdgeEffectStyle(.soft, for: .top)
         .navigationTitle("Library")
-        .navigationSubtitle("\(items.count) items")
-        .toolbar {
-            ToolbarItemGroup {
+        .safeAreaInset(edge: .top, spacing: 0) {
+            ScreenHeader(title: "Library", subtitle: "\(items.count) items") {
                 Picker("Type", selection: $filter) {
                     Text("All").tag("all")
                     Text("Movies").tag("movie")
                     Text("Series").tag("series")
                 }
                 .pickerStyle(.segmented)
+                .fixedSize()
                 Picker("Sort", selection: $sort) {
                     ForEach(Sort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
+                .fixedSize()
             }
         }
     }

@@ -16,6 +16,8 @@ struct HomeView: View {
             LazyVStack(alignment: .leading, spacing: 30) {
                 if let hero {
                     HeroBanner(meta: hero)
+                } else {
+                    ScreenHeader(title: "Home")
                 }
                 ContinueWatchingShelf()
                 ForEach(rows) { row in
@@ -35,13 +37,6 @@ struct HomeView: View {
         .scrollEdgeEffectStyle(.soft, for: .top)
         .ignoresSafeArea(edges: hero == nil ? [] : .top)
         .navigationTitle("Home")
-        .toolbar {
-            ToolbarItem {
-                Button("Refresh", systemImage: "arrow.clockwise") {
-                    Task { await app.addons.refreshManifests() }
-                }
-            }
-        }
     }
 }
 
@@ -200,6 +195,7 @@ struct CatalogGridView: View {
     @Environment(AppModel.self) private var app
     var row: CatalogRow
     var genre: String?
+    var showsHeader = true
 
     @State private var metas: [MetaPreview] = []
     @State private var seen = Set<String>()
@@ -218,8 +214,13 @@ struct CatalogGridView: View {
             }
             if isLoading { ProgressView().padding() }
         }
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if showsHeader {
+                ScreenHeader(title: row.catalog.name, subtitle: row.addon.manifest.name)
+            }
+        }
         .navigationTitle(row.catalog.name)
-        .navigationSubtitle(row.addon.manifest.name)
         .task(id: "\(row.id)|\(genre ?? "")") {
             metas = []
             seen = []

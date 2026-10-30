@@ -20,9 +20,13 @@ struct VStreamApp: App {
                 .onOpenURL { app.handle(url: $0) }
         }
         .defaultSize(width: 1360, height: 860)
-        .windowToolbarStyle(.unified)
+        .windowStyle(.hiddenTitleBar)
         .commands {
             SidebarCommands()
+            CommandGroup(before: .sidebar) {
+                Button("Refresh Addons") { Task { await app.addons.refreshManifests() } }
+                    .keyboardShortcut("r", modifiers: .command)
+            }
             CommandGroup(after: .newItem) {
                 Button("Sync Now") { Task { await app.stremio.sync() } }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
