@@ -2,8 +2,8 @@ import SwiftUI
 
 /// In-content header that replaces the window toolbar: title on the left, controls on the right.
 /// It is the first item of the page's scroll content, so it scrolls away instead of floating over posters.
-/// On the Mac and iPad a tab's own page drops the title (the highlighted sidebar row or tab already
-/// names it) and keeps the subtitle; pushed pages and iPhone, with its large titles, keep it.
+/// On the Mac and iPad a tab's own page shows only its controls (the highlighted sidebar row or tab
+/// already names it); pushed pages and iPhone, with its large titles, keep the title.
 struct ScreenHeader<Controls: View>: View {
     @Environment(AppModel.self) private var app
     #if os(iOS)
@@ -33,8 +33,6 @@ struct ScreenHeader<Controls: View>: View {
                 HStack(alignment: .center, spacing: 16) {
                     if showsTitle {
                         titleBlock(font: .title2.weight(.bold))
-                    } else if let subtitle {
-                        Text(subtitle).font(.callout).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 12)
                     GlassEffectContainer(spacing: 10) {
