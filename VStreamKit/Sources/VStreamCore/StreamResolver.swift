@@ -25,6 +25,8 @@ public enum ResolvePhase: Sendable, Hashable {
     case resolvingDebrid(DebridService)
     /// Not cached: the torrent was sent to the debrid service to download for next time.
     case addedToDebrid(DebridService)
+    /// The debrid service failed (expired key, outage, timeout); streaming peer-to-peer instead.
+    case debridUnavailable(DebridService)
     case torrent(TorrentPhase)
 }
 
@@ -102,7 +104,8 @@ public struct StreamResolver: Sendable {
                     episode: context.episode
                 )
                 do {
-                    let link = try await debrid.resolve(request)
+                    // Bounded so a hung service still falls back to peer-to-peer.
+                    let link = try await withTimeout(30) { try await debrid.resolve(request) }
                     return .play(ResolvedPlayback(url: link.url, headers: [:], source: .debrid(debrid.service), filename: link.filename))
                 } catch DebridError.notCached where mode == .automatic {
                     // Stream peer-to-peer now; the debrid service downloads it meanwhile.
@@ -113,6 +116,10 @@ public struct StreamResolver: Sendable {
                 } catch DebridError.notCached where addsUncachedToDebrid {
                     try await debrid.startDownload(request)
                     throw ResolveError.queuedOnDebrid(debrid.service)
+                } catch where mode == .automatic && !(error is CancellationError) {
+                    // Debrid is optional in automatic mode: an expired key, an outage or a
+                    // timeout falls back to peer-to-peer rather than failing playback.
+                    onPhase(.debridUnavailable(debrid.service))
                 }
             } else if mode == .debridOnly {
                 throw ResolveError.debridRequired

@@ -95,6 +95,8 @@ final class PlaybackSession: Identifiable {
                     Task { @MainActor [weak self] in
                         if case let .addedToDebrid(service) = phase {
                             Self.log.notice("not cached; added to \(service.displayName, privacy: .public)")
+                        } else if case let .debridUnavailable(service) = phase {
+                            Self.log.notice("\(service.displayName, privacy: .public) failed; falling back to P2P")
                         }
                         self?.stage = .resolving(Self.describe(phase))
                     }
@@ -256,6 +258,7 @@ final class PlaybackSession: Identifiable {
         switch phase {
         case let .resolvingDebrid(service): "Resolving with \(service.displayName)"
         case let .addedToDebrid(service): "Not cached · added to \(service.displayName) for next time"
+        case let .debridUnavailable(service): "\(service.displayName) unavailable · streaming peer-to-peer"
         case .torrent(.startingEngine): "Starting torrent engine"
         case .torrent(.fetchingMetadata): "Fetching torrent metadata"
         case let .torrent(.preparingFile(name)): "Preparing \(name)"

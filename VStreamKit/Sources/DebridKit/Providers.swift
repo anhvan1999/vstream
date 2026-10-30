@@ -68,6 +68,13 @@ public struct RealDebridProvider: DebridProvider {
     }
 
     public func startDownload(_ request: DebridRequest) async throws {
+        // Real-Debrid adds a new entry per call; skip torrents already in the account.
+        var list = URLComponents(url: base.appending(path: "torrents"), resolvingAgainstBaseURL: false)!
+        list.queryItems = [URLQueryItem(name: "limit", value: "100")]
+        let data = try await http.request(list.url!)
+        let existing = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] ?? []
+        if existing.contains(where: { ($0["hash"] as? String)?.lowercased() == request.infoHash }) { return }
+
         let added = try await http.jsonObject(base.appending(path: "torrents/addMagnet"), method: "POST", form: [("magnet", request.magnet)])
         guard let id = added["id"] as? String else { throw DebridError.api("Real-Debrid did not accept the magnet") }
         let info = try await waitForFiles(id)
@@ -150,11 +157,17 @@ public struct TorboxProvider: DebridProvider {
         var list = URLComponents(url: base.appending(path: "torrents/mylist"), resolvingAgainstBaseURL: false)!
         list.queryItems = [URLQueryItem(name: "id", value: String(torrentID)), URLQueryItem(name: "bypass_cache", value: "true")]
         let torrent = try await http.jsonObject(list.url!)["data"] as? [String: Any] ?? [:]
+        // A torrent already in the account (sent by `startDownload`) is returned even while it is
+        // still downloading; it only has files once TorBox finished it.
+        if torrent["download_finished"] as? Bool == false || torrent["download_present"] as? Bool == false {
+            throw DebridError.notCached
+        }
         let files = (torrent["files"] as? [[String: Any]] ?? []).compactMap { file -> DebridFile? in
             guard let id = file.int("id") else { return nil }
             let path = file["name"] as? String ?? file["short_name"] as? String ?? file["absolute_path"] as? String ?? ""
             return DebridFile(id: String(id), path: path, size: file.int64("size") ?? 0)
         }
+        guard !files.isEmpty else { throw DebridError.notCached }
         guard let selected = DebridFileSelector.select(files, request: request) else { throw DebridError.noPlayableFile }
 
         var download = URLComponents(url: base.appending(path: "torrents/requestdl"), resolvingAgainstBaseURL: false)!
@@ -217,7 +230,10 @@ public struct PremiumizeProvider: DebridProvider {
     public func resolve(_ request: DebridRequest) async throws -> DebridLink {
         let response = try await http.jsonObject(base.appending(path: "transfer/directdl"), method: "POST", form: [("src", request.magnet)])
         guard response["status"] as? String == "success" else {
-            throw DebridError.api(response["message"] as? String ?? "Premiumize could not resolve this torrent")
+            let message = response["message"] as? String
+            // directdl only works for cached content; anything else is "not in cache".
+            if message == nil || message!.range(of: "cache", options: .caseInsensitive) != nil { throw DebridError.notCached }
+            throw DebridError.api(message!)
         }
         let content = response["content"] as? [[String: Any]] ?? []
         let files = content.enumerated().compactMap { index, file -> DebridFile? in

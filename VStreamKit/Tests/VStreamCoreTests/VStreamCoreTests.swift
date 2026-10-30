@@ -47,6 +47,11 @@ private actor Downloads {
         #expect(await debrid.downloads.hashes == [torrent.infoHash])
     }
 
+    @Test func debridOnlyReportsExpiredKey() async {
+        let resolver = StreamResolver(debrid: MockDebrid(result: .failure(.invalidKey)), mode: .debridOnly, addsUncachedToDebrid: true)
+        await #expect(throws: DebridError.self) { try await resolver.resolve(torrent, context: .init()) }
+    }
+
     @Test func debridOnlyFailsWhenNotCached() async {
         let resolver = StreamResolver(debrid: MockDebrid(result: .failure(.notCached)), mode: .debridOnly)
         await #expect(throws: DebridError.self) { try await resolver.resolve(torrent, context: .init()) }
