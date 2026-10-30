@@ -3,7 +3,7 @@
 Native macOS media player for Stremio addons, built with SwiftUI and Liquid Glass.
 
 - Stremio addon protocol: catalogs, meta, streams, subtitles; install by URL or `stremio://` link
-- Playback with libmpv (MPVKit): Metal/MoltenVK, VideoToolbox hardware decoding, HDR/EDR
+- Playback with libmpv ([Nuvio's MPVKit fork](https://github.com/NuvioMedia/MPVKit/tree/Nuvio), whose MoltenVK context follows window resizes): Metal/MoltenVK, VideoToolbox hardware decoding, HDR/EDR
 - Torrent streaming with nuvio-engine (libtorrent, local HTTP range server)
 - Debrid: Real-Debrid, TorBox, Premiumize (API key), with automatic P2P fallback
 - Stremio account sync (addon collection, library, watch progress) and Trakt (scrobble, history, watchlist)
