@@ -55,6 +55,8 @@ final class AppModel {
     var pendingAddonURL: String?
     /// A link or `.torrent` handed to the app (drop, Open With, magnet URL) for Play Link to open.
     var pendingLink: URL?
+    /// Home's carousel titles, kept here so switching tabs doesn't rebuild an empty Home.
+    var homeFeatured: [MetaPreview] = []
     var isImportingTorrent = false
     var playLinkFocusRequest = 0
     var alert: AppAlert?

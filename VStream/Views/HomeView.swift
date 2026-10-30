@@ -5,7 +5,7 @@ import VStreamCore
 
 struct HomeView: View {
     @Environment(AppModel.self) private var app
-    @State private var featured: [MetaPreview] = []
+    private var featured: [MetaPreview] { app.homeFeatured }
 
     private var rows: [CatalogRow] {
         ContentService.homeRows(app.addons.enabled, includeAdult: app.settings.settings.showAdultCatalogs)
@@ -14,28 +14,32 @@ struct HomeView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 30) {
+            // The hero sits outside the lazy stack: swapping it in for the header inside a
+            // LazyVStack wasn't laid out until the next scroll.
+            VStack(alignment: .leading, spacing: 30) {
                 if !featured.isEmpty {
                     HeroCarousel(items: featured)
                 } else {
                     ScreenHeader(title: "Home")
                 }
-                ContinueWatchingShelf()
-                if app.trakt.isConnected {
-                    ForEach(TraktAccount.List.allCases, id: \.self) { list in
-                        TraktShelf(list: list)
-                    }
-                }
-                ForEach(rows) { row in
-                    CatalogShelf(row: row) { metas in
-                        if featured.isEmpty {
-                            featured = Array(metas.filter { $0.background != nil }.prefix(8))
+                LazyVStack(alignment: .leading, spacing: 30) {
+                    ContinueWatchingShelf()
+                    if app.trakt.isConnected {
+                        ForEach(TraktAccount.List.allCases, id: \.self) { list in
+                            TraktShelf(list: list)
                         }
                     }
-                }
-                if rows.isEmpty {
-                    EmptyStateView(title: "No catalogs", symbol: "puzzlepiece.extension", message: "Install an addon with catalogs, such as Cinemeta.")
-                        .padding(.top, 80)
+                    ForEach(rows) { row in
+                        CatalogShelf(row: row) { metas in
+                            if featured.isEmpty {
+                                app.homeFeatured = Array(metas.filter { $0.background != nil }.prefix(8))
+                            }
+                        }
+                    }
+                    if rows.isEmpty {
+                        EmptyStateView(title: "No catalogs", symbol: "puzzlepiece.extension", message: "Install an addon with catalogs, such as Cinemeta.")
+                            .padding(.top, 80)
+                    }
                 }
             }
             .padding(.bottom, 40)
