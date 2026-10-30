@@ -133,7 +133,8 @@ xcodebuild -project VStream.xcodeproj -scheme VStream-iOS -destination 'generic/
 ```
 
 To run it on a device, open the project in Xcode, pick the `VStream-iOS` scheme and your iPhone or iPad,
-and let Xcode manage signing. A free Apple ID gives builds that expire after 7 days, a paid developer
+and let Xcode manage signing, or run `scripts/install-ios.sh`, which builds, installs and launches it on the
+first paired device. Once paired by cable, this also works over Wi-Fi (same network, device unlocked). A free Apple ID gives builds that expire after 7 days, a paid developer
 account one year. Torrents pause when the app is in the background; debrid and HTTP streams keep playing.
 
 ### Signing
