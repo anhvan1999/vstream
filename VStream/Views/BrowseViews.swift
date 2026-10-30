@@ -71,20 +71,14 @@ struct DiscoverView: View {
 
 struct SearchView: View {
     @Environment(AppModel.self) private var app
-    @Environment(\.isFullScreen) private var isFullScreen
     var query: String
     @State private var results: [SearchResultGroup] = []
     @State private var isSearching = false
 
     var body: some View {
-        Group {
-            if isFullScreen {
-                content.safeAreaInset(edge: .top, spacing: 0) { InlineSearchField() }
-            } else {
-                content.modifier(ToolbarSearch())
-            }
-        }
-        .navigationTitle("Search")
+        content
+            .modifier(ToolbarSearch())
+            .navigationTitle("Search")
         .task(id: query) {
             let trimmed = query.trimmingCharacters(in: .whitespaces)
             guard trimmed.count >= 2 else { results = []; return }
@@ -130,7 +124,7 @@ struct SearchView: View {
     }
 }
 
-/// Windowed: the search field lives in the (otherwise invisible) toolbar.
+/// The search field lives in the (otherwise invisible) toolbar.
 private struct ToolbarSearch: ViewModifier {
     @Environment(AppModel.self) private var app
     @FocusState private var focused: Bool
@@ -142,37 +136,6 @@ private struct ToolbarSearch: ViewModifier {
             .searchable(text: $app.searchText, placement: .toolbarPrincipal, prompt: "Movies, shows, channels")
             .searchFocused($focused)
             .onAppear { focused = true }
-    }
-}
-
-/// Full screen: no toolbar, so the field floats on glass at the top of the content.
-private struct InlineSearchField: View {
-    @Environment(AppModel.self) private var app
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        @Bindable var app = app
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField("Movies, shows, channels", text: $app.searchText)
-                .textFieldStyle(.plain)
-                .focused($focused)
-            if !app.searchText.isEmpty {
-                Button { app.searchText = "" } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .font(.title3)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(maxWidth: 520)
-        .glassEffect(.regular, in: .capsule)
-        .padding(.top, 16)
-        .padding(.bottom, 8)
-        .frame(maxWidth: .infinity)
-        .onAppear { focused = true }
     }
 }
 

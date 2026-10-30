@@ -3,7 +3,6 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var app
-    @State private var isFullScreen = false
 
     var body: some View {
         @Bindable var app = app
@@ -19,8 +18,6 @@ struct RootView: View {
                 }
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
-            // In full screen there is no title bar above the list, so give it the same breathing room.
-            .contentMargins(.top, isFullScreen ? 28 : 0, for: .scrollContent)
             .safeAreaInset(edge: .bottom) { AccountBadge().padding(10) }
         } detail: {
             NavigationStack(path: $app.path) {
@@ -34,14 +31,12 @@ struct RootView: View {
             }
         }
         .toolbar(removing: .sidebarToggle)
-        // Windowed, the toolbar stays (it carries the traffic lights) but is invisible except on
-        // Search, where it hosts the search field. In full screen it slides in only when the pointer
-        // reaches the top edge, like other native apps, and Search shows its field in the content.
+        // The toolbar stays (it carries the traffic lights) but is invisible except on Search,
+        // where it hosts the search field.
         .toolbarBackgroundVisibility(showsToolbar ? .automatic : .hidden, for: .windowToolbar)
-        .windowToolbarFullScreenVisibility(.onHover)
         .toolbar(removing: .title)
-        .trackingFullScreen($isFullScreen)
-        .environment(\.isFullScreen, isFullScreen)
+        // Only the player goes full screen; the green button zooms this window instead.
+        .fullScreenAllowed(false)
         .onChange(of: app.selection) { app.path = [] }
         #if DEBUG
         .task { debugAutoplay() }
