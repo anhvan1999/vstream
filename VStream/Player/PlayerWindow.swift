@@ -52,7 +52,9 @@ private struct PlayerScreen: View {
 
             if controlsVisible || !player.isPlaying || !isReady {
                 controls
-                    .transition(.opacity)
+                    // Animate only the fade: an ambient animation here also animated the scrubber
+                    // when pressing it flipped controlsVisible in the same transaction.
+                    .transition(.opacity.animation(.easeInOut(duration: 0.2)))
             }
 
             if session.showNextUp, let next = session.nextVideo {
@@ -63,7 +65,6 @@ private struct PlayerScreen: View {
             }
         }
         .ignoresSafeArea()
-        .animation(.easeInOut(duration: 0.2), value: controlsVisible)
         .onContinuousHover { phase in
             if case .active = phase { revealControls() }
         }
@@ -153,7 +154,7 @@ private struct PlayerScreen: View {
             Spacer()
             if isReady {
                 bottomBar
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(.move(edge: .bottom).combined(with: .opacity).animation(.easeOut(duration: 0.25)))
             }
         }
         .padding(.horizontal, 24)
@@ -170,7 +171,6 @@ private struct PlayerScreen: View {
             .allowsHitTesting(false)
         }
         .environment(\.colorScheme, .dark)
-        .animation(.easeOut(duration: 0.25), value: isReady)
     }
 
     private var topBar: some View {
@@ -437,31 +437,37 @@ private struct Timeline: View {
                 Rectangle().fill(.white.opacity(0.18)).frame(width: width * buffered)
                 Rectangle().fill(.white).frame(width: width * progress)
             }
+            // The played part follows the pointer exactly; never inherit an animation for it.
+            .transaction(value: scrubbing) { $0.animation = nil }
             .frame(height: height)
             .clipShape(.capsule)
             .overlay(alignment: .leading) {
-                if let scrubbing {
-                    ZStack {
-                        Circle()
-                            .fill(.white)
-                            .frame(width: Self.knobSize, height: Self.knobSize)
-                            .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
-                        Text(Self.format(scrubbing))
-                            .font(.callout.monospacedDigit().weight(.semibold))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .glassEffect(.regular, in: .capsule)
-                            .fixedSize()
-                            .offset(y: -40)
+                // The positioning box always exists and only moves; the knob appears and
+                // disappears inside it. (Transitioning an offset view scales the offset too,
+                // so the knob flew in from, and back to, the start of the bar.)
+                ZStack {
+                    if let scrubbing {
+                        ZStack {
+                            Circle()
+                                .fill(.white)
+                                .frame(width: Self.knobSize, height: Self.knobSize)
+                                .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
+                            Text(Self.format(scrubbing))
+                                .font(.callout.monospacedDigit().weight(.semibold))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .glassEffect(.regular, in: .capsule)
+                                .fixedSize()
+                                .offset(y: -40)
+                        }
+                        .transition(.scale(scale: 0.6).combined(with: .opacity).animation(.easeOut(duration: 0.12)))
                     }
-                    // Pin the stack to the knob's width (the bubble overflows) so the knob's centre,
-                    // not the wider bubble's, sits exactly at the end of the played fill.
-                    .frame(width: Self.knobSize, height: Self.knobSize)
-                    .offset(x: width * progress - Self.knobSize / 2)
-                    // Appear/disappear in place; the animation is scoped to the transition so the
-                    // knob never slides along the bar.
-                    .transition(.scale(scale: 0.6).combined(with: .opacity).animation(.easeOut(duration: 0.12)))
                 }
+                // Pinned to the knob's size (the bubble overflows) so its centre sits exactly
+                // at the end of the played fill.
+                .frame(width: Self.knobSize, height: Self.knobSize)
+                .offset(x: width * progress - Self.knobSize / 2)
+                .transaction(value: scrubbing) { $0.animation = nil }
             }
             .frame(maxHeight: .infinity)
             .contentShape(.rect)

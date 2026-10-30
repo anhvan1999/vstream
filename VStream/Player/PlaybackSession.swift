@@ -69,7 +69,7 @@ final class PlaybackSession: Identifiable {
     private func start() {
         guard let app else { return }
         // Diagnostics only: no URLs or keys.
-        Self.log.info("""
+        Self.log.notice("""
         play \(self.meta.id, privacy: .public) video=\(self.videoID, privacy: .public) \
         stream name=\((self.stream.name ?? "-").replacingOccurrences(of: "\n", with: " "), privacy: .public) \
         hasURL=\(self.stream.url != nil, privacy: .public) host=\(self.stream.url?.host ?? "-", privacy: .public) \
@@ -96,7 +96,7 @@ final class PlaybackSession: Identifiable {
                     NSWorkspace.shared.open(url)
                     self.stage = .failed("Opened in your browser")
                 case let .play(resolved):
-                    Self.log.info("resolved source=\(String(describing: resolved.source), privacy: .public) host=\(resolved.url.host ?? "-", privacy: .public)")
+                    Self.log.notice("resolved source=\(String(describing: resolved.source), privacy: .public) host=\(resolved.url.host ?? "-", privacy: .public)")
                     self.source = resolved.source
                     self.resolvedURL = resolved.url
                     self.player.load(PlaybackRequest(
