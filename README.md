@@ -81,6 +81,18 @@ These plays are not recorded in Continue Watching or Trakt.
 - Reorder addons (earlier addons answer first), enable or disable them, and open an addon's configure page.
 - **Browse Community Addons** opens [stremio-addons.net](https://stremio-addons.net).
 
+## Install a release
+
+Download `VStream-<version>.dmg` from [Releases](../../releases) and drag VStream into Applications. Release
+builds are ad-hoc signed and not notarized, so macOS blocks them the first time. Clear the quarantine flag once:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/VStream.app
+```
+
+Or open the app once, then click **Open Anyway** in System Settings → Privacy & Security. macOS 26 or later is
+required. The app is a universal binary (Apple Silicon and Intel).
+
 ## Requirements
 
 - macOS 26 or later, Xcode 26 or later (Swift 6.2)
