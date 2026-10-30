@@ -121,6 +121,8 @@ public final class PlayerModel {
     @ObservationIgnored private var subtitleStyle = SubtitleStyle()
     @ObservationIgnored private var lastLogLine: String?
     @ObservationIgnored private var fileLoaded = false
+    /// Right after a seek mpv may still report the old time; ignore those so the UI doesn't jump back.
+    @ObservationIgnored private var seekTarget: (seconds: Double, issuedAt: Date)?
     @ObservationIgnored public var onEnded: (() -> Void)?
 
     public init(hardwareDecoding: Bool = true, bufferMB: Int = 512) {
@@ -203,11 +205,13 @@ public final class PlayerModel {
 
     public func seek(to seconds: Double) {
         position = max(0, min(seconds, duration > 0 ? duration : seconds))
+        seekTarget = (position, Date())
         controller.command(["seek", String(format: "%.3f", position), "absolute+keyframes"])
     }
 
     public func seek(by seconds: Double) {
         position = max(0, position + seconds)
+        seekTarget = (position, Date())
         controller.command(["seek", String(format: "%.3f", seconds), "relative+exact"])
     }
 
@@ -280,6 +284,10 @@ public final class PlayerModel {
                     }
                 case let ("seeking", .flag(flag)): isSeeking = flag
                 case let ("time-pos", .double(seconds)):
+                    if let target = seekTarget {
+                        if abs(seconds - target.seconds) > 2, Date().timeIntervalSince(target.issuedAt) < 1.5 { break }
+                        seekTarget = nil
+                    }
                     if abs(seconds - lastPublishedPosition) >= 0.25 || isSeeking {
                         lastPublishedPosition = seconds
                         position = seconds

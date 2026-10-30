@@ -422,7 +422,9 @@ private struct Timeline: View {
                     // not the wider bubble's, sits exactly at the end of the played fill.
                     .frame(width: Self.knobSize, height: Self.knobSize)
                     .offset(x: width * progress - Self.knobSize / 2)
-                    .transition(.scale(scale: 0.4).combined(with: .opacity))
+                    // Appear/disappear in place; the animation is scoped to the transition so the
+                    // knob never slides along the bar.
+                    .transition(.scale(scale: 0.6).combined(with: .opacity).animation(.easeOut(duration: 0.12)))
                 }
             }
             .frame(maxHeight: .infinity)
@@ -440,7 +442,6 @@ private struct Timeline: View {
                     }
             )
             .onHover { isHovering = $0 }
-            .animation(.spring(duration: 0.25, bounce: 0.3), value: scrubbing != nil)
             .animation(.easeOut(duration: 0.15), value: isHovering)
         }
         .frame(height: Self.knobSize)
