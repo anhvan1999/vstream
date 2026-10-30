@@ -108,6 +108,9 @@ final class PlaybackSession: Identifiable {
                     Self.log.notice("resolved source=\(String(describing: resolved.source), privacy: .public) host=\(resolved.url.host ?? "-", privacy: .public)")
                     self.source = resolved.source
                     self.resolvedURL = resolved.url
+                    if self.recordsProgress {
+                        app.lastStreams.remember(itemID: self.meta.id, videoID: videoID, stream: stream)
+                    }
                     self.player.load(PlaybackRequest(
                         url: resolved.url,
                         headers: resolved.headers,

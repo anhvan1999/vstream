@@ -203,6 +203,8 @@ struct HeroBanner: View {
 
 struct ContinueWatchingShelf: View {
     @Environment(AppModel.self) private var app
+    @Environment(\.openWindow) private var openWindow
+    @State private var resuming: String?
 
     var body: some View {
         let entries = app.library.continueWatching
@@ -210,7 +212,7 @@ struct ContinueWatchingShelf: View {
             Shelf(title: "Continue Watching") {
                 ForEach(entries) { entry in
                     Button {
-                        app.path.append(MetaRoute(type: entry.item.type, id: entry.item.id, preview: nil))
+                        resume(entry)
                     } label: {
                         PosterCard(
                             title: entry.item.name,
@@ -219,9 +221,19 @@ struct ContinueWatchingShelf: View {
                             subtitle: label(for: entry),
                             progress: entry.isNextUp ? nil : entry.item.progress
                         )
+                        .overlay {
+                            if resuming == entry.id {
+                                ProgressView()
+                                    .controlSize(.large)
+                                    .frame(width: 150, height: 225)
+                                    .background(.black.opacity(0.35), in: .rect(cornerRadius: 12))
+                                    .frame(maxHeight: .infinity, alignment: .top)
+                            }
+                        }
                     }
                     .buttonStyle(.plain)
                     .contextMenu {
+                        Button("Details", systemImage: "info.circle") { openDetails(entry) }
                         Button("Remove from Continue Watching", systemImage: "xmark") {
                             app.library.removeFromContinueWatching(entry.item.id)
                         }
@@ -229,6 +241,26 @@ struct ContinueWatchingShelf: View {
                 }
             }
         }
+    }
+
+    /// Plays the stream from last time; titles without one open their page to pick a stream.
+    private func resume(_ entry: ContinueWatchingEntry) {
+        guard resuming == nil else { return }
+        resuming = entry.id
+        Task {
+            defer { resuming = nil }
+            if await app.resume(entry) {
+                #if os(macOS)
+                openWindow(id: "player")
+                #endif
+            } else {
+                openDetails(entry)
+            }
+        }
+    }
+
+    private func openDetails(_ entry: ContinueWatchingEntry) {
+        app.path.append(MetaRoute(type: entry.item.type, id: entry.item.id, preview: nil))
     }
 
     private func label(for entry: ContinueWatchingEntry) -> String? {

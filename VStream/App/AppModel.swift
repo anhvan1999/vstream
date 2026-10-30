@@ -45,6 +45,7 @@ final class AppModel {
     let addons = AddonStore()
     let library = LibraryStore()
     let content = ContentService()
+    let lastStreams = LastStreamStore()
     @ObservationIgnored private(set) lazy var stremio = StremioAccount(addons: addons, library: library)
     @ObservationIgnored private(set) lazy var trakt = TraktAccount(settings: settings, library: library)
 
@@ -103,6 +104,32 @@ final class AppModel {
     func play(meta: MetaDetail, video: Video?, stream: AddonStream, recordsProgress: Bool = true, torrentFile: Data? = nil) {
         playback?.close()
         playback = PlaybackSession(app: self, meta: meta, video: video, stream: stream, recordsProgress: recordsProgress, torrentFile: torrentFile)
+    }
+
+    /// Continue Watching: plays the stream used last time (or, for the next episode, one from the
+    /// same release via `bingeGroup`). Returns false when there's none, so the caller opens the
+    /// title's page to pick a stream instead.
+    func resume(_ entry: ContinueWatchingEntry) async -> Bool {
+        guard let last = lastStreams.stream(for: entry.item.id) else { return false }
+        let item = entry.item
+        let preview = MetaPreview(id: item.id, type: item.type, name: item.name, poster: item.poster)
+        let addons = addons.enabled
+        let meta = (try? await content.meta(type: item.type, id: item.id, addons: addons)) ?? MetaDetail(preview: preview)
+        let videoID = entry.videoID ?? item.id
+        let video = meta.videos.first { $0.id == videoID }
+
+        if last.videoID == videoID {
+            play(meta: meta, video: video, stream: last.stream)
+            return true
+        }
+        guard let bingeGroup = last.stream.behaviorHints.bingeGroup else { return false }
+        for await group in content.streams(type: item.type, id: videoID, addons: addons) {
+            if let match = group.streams.first(where: { $0.behaviorHints.bingeGroup == bingeGroup }) {
+                play(meta: meta, video: video, stream: match)
+                return true
+            }
+        }
+        return false
     }
 
     func closePlayback() {
