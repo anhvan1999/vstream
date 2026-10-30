@@ -123,11 +123,11 @@ public final class PlayerModel {
     @ObservationIgnored private var fileLoaded = false
     @ObservationIgnored public var onEnded: (() -> Void)?
 
-    public init(hardwareDecoding: Bool = true) {
+    public init(hardwareDecoding: Bool = true, bufferMB: Int = 300) {
         controller = MPVController { [weak self] events in
             Task { @MainActor in self?.handle(events) }
         }
-        controller.start(hardwareDecoding: hardwareDecoding)
+        controller.start(hardwareDecoding: hardwareDecoding, bufferMB: bufferMB)
         apply(subtitleStyle)
     }
 

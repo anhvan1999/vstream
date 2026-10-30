@@ -99,7 +99,7 @@ final class MPVController: @unchecked Sendable {
         }
     }
 
-    func start(hardwareDecoding: Bool) {
+    func start(hardwareDecoding: Bool, bufferMB: Int) {
         guard handle == nil, let mpv = mpv_create() else { return }
         handle = mpv
 
@@ -143,8 +143,9 @@ final class MPVController: @unchecked Sendable {
             ("subs-fallback", "yes"),
             ("sub-auto", "no"),
             ("cache", "yes"),
-            ("demuxer-max-bytes", "512MiB"),
-            ("demuxer-max-back-bytes", "128MiB"),
+            // In-memory read-ahead for streams; a quarter of it is kept for seeking back.
+            ("demuxer-max-bytes", "\(max(bufferMB, 32))MiB"),
+            ("demuxer-max-back-bytes", "\(max(bufferMB / 4, 16))MiB"),
             ("demuxer-readahead-secs", "120"),
             ("network-timeout", "60"),
             ("screenshot-directory", "~/Pictures"),
@@ -159,6 +160,17 @@ final class MPVController: @unchecked Sendable {
             handle = nil
             return
         }
+        #if DEBUG
+        // Safe to read synchronously here: no VO thread exists yet.
+        if ProcessInfo.processInfo.environment["VSTREAM_MPV_LOG"] != nil {
+            for name in ["demuxer-max-bytes", "demuxer-max-back-bytes"] {
+                if let value = mpv_get_property_string(mpv, name) {
+                    FileHandle.standardError.write(Data("[mpv/config] \(name)=\(String(cString: value))\n".utf8))
+                    mpv_free(value)
+                }
+            }
+        }
+        #endif
         for (name, format) in Self.observed {
             mpv_observe_property(mpv, 0, name, format)
         }

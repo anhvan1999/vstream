@@ -165,6 +165,12 @@ private struct PlaybackSettings: View {
         Form {
             Section("Player") {
                 Toggle("Hardware decoding (VideoToolbox)", isOn: $settings.settings.hardwareDecoding)
+                Picker("Stream buffer (memory)", selection: $settings.settings.streamBufferMB) {
+                    ForEach([100, 200, 300, 500, 750, 1000, 1500, 2000], id: \.self) { megabytes in
+                        Text(megabytes >= 1000 ? "\((Double(megabytes) / 1000).formatted()) GB" : "\(megabytes) MB").tag(megabytes)
+                    }
+                }
+                .help("How much video the player reads ahead into RAM. Larger values ride out slow connections; applies to the next video.")
                 Toggle("Play next episode automatically", isOn: $settings.settings.autoplayNextEpisode)
                 Toggle("Show adult catalogs", isOn: $settings.settings.showAdultCatalogs)
             }

@@ -44,7 +44,7 @@ final class PlaybackSession: Identifiable {
         self.meta = meta
         self.video = video
         self.stream = stream
-        player = PlayerModel(hardwareDecoding: app.settings.settings.hardwareDecoding)
+        player = PlayerModel(hardwareDecoding: app.settings.settings.hardwareDecoding, bufferMB: app.settings.settings.streamBufferMB)
         player.apply(app.settings.settings.subtitleStyle)
         player.onEnded = { [weak self] in self?.handleEnded() }
         start()

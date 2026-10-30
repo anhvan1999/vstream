@@ -26,6 +26,8 @@ public struct AppSettings: Codable, Sendable, Hashable {
     public var torrentMode: TorrentMode = .automatic
     public var torrent = TorrentSettings()
     public var hardwareDecoding = true
+    /// mpv's in-memory stream buffer (read-ahead), in megabytes.
+    public var streamBufferMB = 300
     public var autoplayNextEpisode = true
     public var preferredAudioLanguages: [String] = []
     public var preferredSubtitleLanguages: [String] = []
@@ -39,7 +41,7 @@ public struct AppSettings: Codable, Sendable, Hashable {
     public init() {}
 
     enum CodingKeys: String, CodingKey {
-        case debridService, torrentMode, torrent, hardwareDecoding, autoplayNextEpisode, preferredAudioLanguages
+        case debridService, torrentMode, torrent, hardwareDecoding, streamBufferMB, autoplayNextEpisode, preferredAudioLanguages
         case preferredSubtitleLanguages, subtitleStyle, showAdultCatalogs, traktClientID, hiddenHomeRows
     }
 
@@ -50,6 +52,7 @@ public struct AppSettings: Codable, Sendable, Hashable {
         torrentMode = (try? container.decode(TorrentMode.self, forKey: .torrentMode)) ?? defaults.torrentMode
         torrent = (try? container.decode(TorrentSettings.self, forKey: .torrent)) ?? defaults.torrent
         hardwareDecoding = (try? container.decode(Bool.self, forKey: .hardwareDecoding)) ?? defaults.hardwareDecoding
+        streamBufferMB = (try? container.decode(Int.self, forKey: .streamBufferMB)) ?? defaults.streamBufferMB
         autoplayNextEpisode = (try? container.decode(Bool.self, forKey: .autoplayNextEpisode)) ?? defaults.autoplayNextEpisode
         preferredAudioLanguages = (try? container.decode([String].self, forKey: .preferredAudioLanguages)) ?? []
         preferredSubtitleLanguages = (try? container.decode([String].self, forKey: .preferredSubtitleLanguages)) ?? []
