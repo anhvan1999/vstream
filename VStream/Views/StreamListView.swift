@@ -3,6 +3,20 @@ import DebridKit
 import SwiftUI
 import VStreamCore
 
+/// A stream with its parsed title, computed once when results arrive (addons can return 1000+).
+private struct DisplayStream: Identifiable {
+    let id: Int
+    let stream: AddonStream
+    let presentation: StreamPresentation
+}
+
+private struct DisplayGroup: Identifiable {
+    let id: String
+    let addon: AddonDescriptor
+    let streams: [DisplayStream]
+    let error: String?
+}
+
 struct StreamListView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.openWindow) private var openWindow
@@ -10,22 +24,19 @@ struct StreamListView: View {
     var video: Video?
     var videoID: String
 
-    @State private var groups: [StreamGroup] = []
+    @State private var groups: [DisplayGroup] = []
     @State private var isLoading = true
     @State private var quality: String?
     @State private var cached: Set<String> = []
 
     private static let qualities = ["2160p", "1080p", "720p", "480p"]
 
-    private var filtered: [StreamGroup] {
-        groups.map { group in
-            var group = group
-            if let quality {
-                group.streams = group.streams.filter { StreamPresentation($0).quality == quality }
-            }
-            return group
+    private var filtered: [DisplayGroup] {
+        guard let quality else { return groups }
+        return groups.map { group in
+            DisplayGroup(id: group.id, addon: group.addon, streams: group.streams.filter { $0.presentation.quality == quality }, error: group.error)
         }
-        .filter { !$0.streams.isEmpty || $0.error != nil }
+        .filter { !$0.streams.isEmpty }
     }
 
     var body: some View {
@@ -52,9 +63,10 @@ struct StreamListView: View {
                         if let error = group.error, group.streams.isEmpty {
                             Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.secondary)
                         }
-                        ForEach(Array(group.streams.enumerated()), id: \.offset) { _, stream in
-                            StreamRow(stream: stream, isCached: stream.infoHash.map(cached.contains) ?? false) {
-                                play(stream)
+                        ForEach(group.streams) { item in
+                            StreamRow(stream: item.stream, presentation: item.presentation,
+                                      isCached: item.stream.infoHash.map(cached.contains) ?? false) {
+                                play(item.stream)
                             }
                         }
                     } header: {
@@ -71,7 +83,7 @@ struct StreamListView: View {
             .overlay {
                 if isLoading && groups.allSatisfy(\.streams.isEmpty) {
                     ProgressView("Finding streams…")
-                } else if !isLoading && filtered.isEmpty {
+                } else if !isLoading && filtered.allSatisfy(\.streams.isEmpty) {
                     EmptyStateView(title: "No streams", symbol: "antenna.radiowaves.left.and.right.slash",
                                    message: "Install a stream addon (for example Torrentio) to watch this.")
                 }
@@ -94,16 +106,27 @@ struct StreamListView: View {
         isLoading = true
         let order = app.addons.enabled.map(\.id)
         for await group in app.content.streams(type: meta.type, id: videoID, addons: app.addons.enabled) {
-            groups.append(group)
+            // Loopback addons (e.g. Stremio's "Local Files") need the Stremio desktop server; a
+            // connection error from them is expected noise, not something to show.
+            if group.streams.isEmpty, group.error != nil, Self.isLoopback(group.addon.transportUrl) { continue }
+            let streams = await Task.detached(priority: .userInitiated) {
+                group.streams.enumerated().map { DisplayStream(id: $0.offset, stream: $0.element, presentation: StreamPresentation($0.element)) }
+            }.value
+            groups.append(DisplayGroup(id: group.id, addon: group.addon, streams: streams, error: group.error))
             groups.sort { (order.firstIndex(of: $0.id) ?? .max) < (order.firstIndex(of: $1.id) ?? .max) }
         }
         isLoading = false
         await checkDebridCache()
     }
 
+    private static func isLoopback(_ url: URL) -> Bool {
+        ["127.0.0.1", "localhost", "::1"].contains(url.host ?? "")
+    }
+
     private func checkDebridCache() async {
         guard let provider = app.settings.debridProvider else { return }
-        let hashes = Array(Set(groups.flatMap(\.streams).compactMap(\.infoHash))).prefix(100)
+        let hashes = Array(Set(groups.flatMap(\.streams).compactMap(\.stream.infoHash))).prefix(100)
+        guard !hashes.isEmpty else { return }
         if let result = try? await provider.cachedHashes(Array(hashes)) {
             cached = result
         }
@@ -117,11 +140,11 @@ struct StreamListView: View {
 
 private struct StreamRow: View {
     var stream: AddonStream
+    var presentation: StreamPresentation
     var isCached: Bool
     var action: () -> Void
 
     var body: some View {
-        let presentation = StreamPresentation(stream)
         Button(action: action) {
             HStack(alignment: .top, spacing: 10) {
                 VStack(spacing: 4) {

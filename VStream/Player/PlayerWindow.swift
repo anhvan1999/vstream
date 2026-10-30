@@ -43,7 +43,7 @@ private struct PlayerScreen: View {
 
             statusOverlay
 
-            if controlsVisible || !player.isPlaying {
+            if controlsVisible || !player.isPlaying || !isReady {
                 controls
                     .transition(.opacity)
             }
@@ -120,14 +120,35 @@ private struct PlayerScreen: View {
         }
     }
 
+    /// Transport only makes sense once mpv has a file with a duration.
+    private var isReady: Bool {
+        session.stage == .playing && !player.isLoading && player.duration > 0
+    }
+
     private var controls: some View {
-        VStack {
+        VStack(spacing: 0) {
             topBar
             Spacer()
-            bottomBar
+            if isReady {
+                bottomBar
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
-        .padding(20)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 20)
+        .background {
+            // Soft scrims instead of glass slabs keep the picture visible.
+            VStack {
+                LinearGradient(colors: [.black.opacity(0.55), .clear], startPoint: .top, endPoint: .bottom).frame(height: 140)
+                Spacer()
+                if isReady {
+                    LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .top, endPoint: .bottom).frame(height: 200)
+                }
+            }
+            .allowsHitTesting(false)
+        }
         .environment(\.colorScheme, .dark)
+        .animation(.easeOut(duration: 0.25), value: isReady)
     }
 
     private var topBar: some View {
@@ -135,20 +156,18 @@ private struct PlayerScreen: View {
             Button {
                 dismissWindow(id: "player")
             } label: {
-                Image(systemName: "chevron.backward").font(.title3.weight(.semibold)).frame(width: 32, height: 32)
+                Image(systemName: "chevron.backward").font(.body.weight(.semibold)).frame(width: 28, height: 28)
             }
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(session.title).font(.headline)
                 if let subtitle = session.subtitle {
                     Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .glassEffect(.regular, in: .capsule)
+            .shadow(color: .black.opacity(0.4), radius: 4)
 
             Spacer()
 
@@ -159,65 +178,95 @@ private struct PlayerScreen: View {
                 SourceChip(source: source, hardwareDecoder: player.hardwareDecoder)
             }
         }
-        .padding(.top, 18)
+        .padding(.top, 38)
     }
 
     private var bottomBar: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 14) {
             Timeline(player: player)
-            HStack(spacing: 14) {
-                GlassEffectContainer(spacing: 8) {
-                    HStack(spacing: 8) {
-                        iconButton("gobackward.10") { player.seek(by: -10) }
-                        iconButton(player.isPlaying ? "pause.fill" : "play.fill", large: true) { player.togglePause() }
-                        iconButton("goforward.10") { player.seek(by: 10) }
+
+            ZStack {
+                // Transport, centred.
+                GlassEffectContainer(spacing: 4) {
+                    HStack(spacing: 4) {
+                        transportButton("gobackward.10", help: "Back 10 seconds") { player.seek(by: -10) }
+                        transportButton(player.isPlaying ? "pause.fill" : "play.fill", large: true, help: "Play/Pause") { player.togglePause() }
+                        transportButton("goforward.10", help: "Forward 10 seconds") { player.seek(by: 10) }
+                    }
+                    .padding(4)
+                    .glassEffect(.regular, in: .capsule)
+                }
+
+                // Secondary actions, trailing.
+                HStack(spacing: 2) {
+                    Spacer()
+                    HStack(spacing: 2) {
                         if session.nextVideo != nil {
-                            iconButton("forward.end.fill") { session.playNext() }
+                            toolButton("forward.end.fill", help: "Next episode") { session.playNext() }
+                        }
+                        subtitleMenu
+                        if player.audioTracks.count > 1 { audioMenu }
+                        moreMenu
+                        toolButton("arrow.up.left.and.arrow.down.right", help: "Full screen") { toggleFullScreen() }
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .glassEffect(.regular, in: .capsule)
+                }
+            }
+        }
+    }
+
+    private func transportButton(_ symbol: String, large: Bool = false, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: { action(); revealControls() }) {
+            Image(systemName: symbol)
+                .font(large ? .title2.weight(.semibold) : .title3)
+                .frame(width: large ? 46 : 38, height: large ? 46 : 38)
+                .contentTransition(.symbolEffect(.replace))
+                .contentShape(.circle)
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+
+    private func toolButton(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: { action(); revealControls() }) {
+            Image(systemName: symbol).font(.body).frame(width: 32, height: 32).contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+
+    private func menuLabel(_ symbol: String) -> some View {
+        Image(systemName: symbol).font(.body).frame(width: 32, height: 32).contentShape(.rect)
+    }
+
+    private var subtitleMenu: some View {
+        Menu {
+            Button {
+                player.selectSubtitle(nil)
+            } label: {
+                if player.selectedSubtitleID == nil { Label("Off", systemImage: "checkmark") } else { Text("Off") }
+            }
+            if !player.subtitleTracks.isEmpty {
+                Section("Subtitles") {
+                    ForEach(player.subtitleTracks) { track in
+                        Button {
+                            player.selectSubtitle(track.id)
+                        } label: {
+                            if player.selectedSubtitleID == track.id { Label(track.displayName, systemImage: "checkmark") } else { Text(track.displayName) }
                         }
                     }
                 }
-                Text("\(format(player.position)) / \(format(player.duration))")
-                    .font(.callout.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                Spacer()
-                VolumeControl(player: player)
-                speedMenu
-                audioMenu
-                subtitleMenu
-                iconButton("arrow.up.left.and.arrow.down.right") { toggleFullScreen() }
-            }
-        }
-        .padding(16)
-        .glassEffect(.regular, in: .rect(cornerRadius: 26))
-    }
-
-    private func iconButton(_ symbol: String, large: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: { action(); revealControls() }) {
-            Image(systemName: symbol)
-                .font(large ? .title2 : .body)
-                .frame(width: large ? 40 : 30, height: large ? 40 : 30)
-                .contentTransition(.symbolEffect(.replace))
-        }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-    }
-
-    private var speedMenu: some View {
-        Menu {
-            ForEach([0.5, 0.75, 1, 1.25, 1.5, 2], id: \.self) { speed in
-                Button {
-                    player.setSpeed(speed)
-                } label: {
-                    if player.speed == speed { Label("\(speed.formatted())×", systemImage: "checkmark") } else { Text("\(speed.formatted())×") }
-                }
             }
         } label: {
-            Image(systemName: "gauge.with.dots.needle.67percent")
+            menuLabel(player.selectedSubtitleID == nil ? "captions.bubble" : "captions.bubble.fill")
         }
         .menuStyle(.button)
-        .buttonStyle(.glass)
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
         .fixedSize()
-        .help("Playback speed")
+        .help("Subtitles")
     }
 
     private var audioMenu: some View {
@@ -230,43 +279,38 @@ private struct PlayerScreen: View {
                 }
             }
         } label: {
-            Image(systemName: "waveform")
+            menuLabel("waveform")
         }
         .menuStyle(.button)
-        .buttonStyle(.glass)
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
         .fixedSize()
-        .disabled(player.audioTracks.count < 2)
-        .help("Audio track")
+        .help("Audio")
     }
 
-    private var subtitleMenu: some View {
+    /// Less frequent settings: speed, subtitle timing, volume.
+    private var moreMenu: some View {
         Menu {
-            Button {
-                player.selectSubtitle(nil)
-            } label: {
-                if player.selectedSubtitleID == nil { Label("Off", systemImage: "checkmark") } else { Text("Off") }
+            Picker("Speed", selection: Binding(get: { player.speed }, set: { player.setSpeed($0) })) {
+                ForEach([0.5, 0.75, 1, 1.25, 1.5, 2], id: \.self) { Text("\($0.formatted())×").tag($0) }
             }
-            Section("Tracks") {
-                ForEach(player.subtitleTracks) { track in
-                    Button {
-                        player.selectSubtitle(track.id)
-                    } label: {
-                        if player.selectedSubtitleID == track.id { Label(track.displayName, systemImage: "checkmark") } else { Text(track.displayName) }
-                    }
-                }
-            }
-            Section("Delay") {
+            Menu("Subtitle Delay (\(player.subtitleDelay.formatted()) s)") {
                 Button("−0.5 s") { player.setSubtitleDelay(player.subtitleDelay - 0.5) }
                 Button("+0.5 s") { player.setSubtitleDelay(player.subtitleDelay + 0.5) }
-                Button("Reset (\(player.subtitleDelay.formatted()) s)") { player.setSubtitleDelay(0) }
+                Button("Reset") { player.setSubtitleDelay(0) }
             }
+            Divider()
+            Button(player.isMuted ? "Unmute" : "Mute") { player.toggleMute() }
+            Button("Volume Up (↑)") { player.adjustVolume(by: 10) }
+            Button("Volume Down (↓)") { player.adjustVolume(by: -10) }
         } label: {
-            Image(systemName: "captions.bubble")
+            menuLabel(player.isMuted ? "speaker.slash.fill" : "ellipsis")
         }
         .menuStyle(.button)
-        .buttonStyle(.glass)
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
         .fixedSize()
-        .help("Subtitles")
+        .help("More")
     }
 
     // MARK: Helpers
@@ -303,40 +347,44 @@ private struct PlayerScreen: View {
     }
 }
 
-/// Scrubbable progress bar with buffered range and hover time preview.
+/// Minimal scrubber in the QuickTime style: a thin bar between the elapsed and remaining times.
+/// Hovering thickens the bar slightly and the elapsed label previews the hovered time; the knob
+/// appears only while dragging.
 private struct Timeline: View {
     let player: PlayerModel
     @State private var scrubbing: Double?
     @State private var hover: Double?
 
     var body: some View {
+        let duration = max(player.duration, 0.001)
+        let shown = scrubbing ?? hover.map { $0 * duration } ?? player.position
+        HStack(spacing: 12) {
+            Text(Self.format(shown))
+                .frame(minWidth: 44, alignment: .trailing)
+                .foregroundStyle(hover != nil || scrubbing != nil ? .white : .white.opacity(0.85))
+            bar(duration: duration)
+            Text("−" + Self.format(max(player.duration - (scrubbing ?? player.position), 0)))
+                .frame(minWidth: 52, alignment: .leading)
+                .foregroundStyle(.white.opacity(0.85))
+        }
+        .font(.callout.monospacedDigit())
+    }
+
+    private func bar(duration: Double) -> some View {
         GeometryReader { geometry in
             let width = geometry.size.width
-            let duration = max(player.duration, 0.001)
-            let progress = (scrubbing ?? player.position) / duration
-            let buffered = min(player.cachedUntil / duration, 1)
+            let progress = min(max((scrubbing ?? player.position) / duration, 0), 1)
+            let buffered = min(max(player.cachedUntil / duration, 0), 1)
+            let active = hover != nil || scrubbing != nil
             ZStack(alignment: .leading) {
-                Capsule().fill(.white.opacity(0.18))
-                Capsule().fill(.white.opacity(0.32)).frame(width: width * buffered)
-                Capsule().fill(.tint).frame(width: max(width * progress, 0))
-                ForEach(player.chapters, id: \.self) { chapter in
-                    Rectangle().fill(.black.opacity(0.5)).frame(width: 2).offset(x: width * chapter.time / duration)
-                }
-                Circle()
-                    .fill(.white)
-                    .frame(width: scrubbing == nil ? 12 : 16)
-                    .offset(x: width * progress - 6)
-                    .shadow(radius: 3)
-                if let hover {
-                    Text(Self.format(hover * duration))
-                        .font(.caption.monospacedDigit())
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .glassEffect(.regular, in: .capsule)
-                        .offset(x: min(max(width * hover - 24, 0), width - 56), y: -26)
+                Capsule().fill(.white.opacity(0.25))
+                Capsule().fill(.white.opacity(0.2)).frame(width: width * buffered)
+                Capsule().fill(.white).frame(width: width * progress)
+                if scrubbing != nil {
+                    Circle().fill(.white).frame(width: 12, height: 12).offset(x: width * progress - 6)
                 }
             }
-            .frame(height: 6)
+            .frame(height: active ? 6 : 4)
             .frame(maxHeight: .infinity)
             .contentShape(.rect)
             .gesture(
@@ -350,35 +398,14 @@ private struct Timeline: View {
             .onContinuousHover { phase in
                 if case let .active(location) = phase { hover = min(max(location.x / width, 0), 1) } else { hover = nil }
             }
+            .animation(.easeOut(duration: 0.12), value: active)
         }
-        .frame(height: 22)
+        .frame(height: 18)
     }
 
     static func format(_ seconds: Double) -> String {
         let total = Int(max(seconds, 0))
         return total >= 3600 ? String(format: "%d:%02d:%02d", total / 3600, total / 60 % 60, total % 60) : String(format: "%d:%02d", total / 60, total % 60)
-    }
-}
-
-private struct VolumeControl: View {
-    let player: PlayerModel
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Button {
-                player.toggleMute()
-            } label: {
-                Image(systemName: player.isMuted || player.volume == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                    .frame(width: 22)
-            }
-            .buttonStyle(.plain)
-            Slider(value: Binding(get: { player.volume }, set: { player.setVolume($0) }), in: 0...100)
-                .frame(width: 90)
-                .controlSize(.small)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .glassEffect(.regular, in: .capsule)
     }
 }
 

@@ -265,8 +265,6 @@ public final class PlayerModel {
     // MARK: Events
 
     private func handle(_ events: [MPVEvent]) {
-        var tracksChanged = false
-        var chaptersChanged = false
         for event in events {
             switch event {
             case let .property(name, value):
@@ -298,8 +296,6 @@ public final class PlayerModel {
                 case let ("sid", .int(id)): selectedSubtitleID = Int(id)
                 case ("sid", .none), ("sid", .string): selectedSubtitleID = nil
                 case let ("sub-delay", .double(value)): subtitleDelay = value
-                case ("track-list/count", _): tracksChanged = true
-                case ("chapter-list/count", _): chaptersChanged = true
                 case let ("hwdec-current", .string(value)): hardwareDecoder = value == "no" ? nil : value
                 default: break
                 }
@@ -307,8 +303,6 @@ public final class PlayerModel {
                 fileLoaded = true
                 isLoading = false
                 errorMessage = nil
-                tracksChanged = true
-                chaptersChanged = true
                 for subtitle in current?.subtitles ?? [] {
                     addSubtitle(subtitle, select: false)
                 }
@@ -322,10 +316,13 @@ public final class PlayerModel {
                 }
             case let .log(message):
                 if !message.isEmpty { lastLogLine = message }
+            case let .tracks(tracks):
+                audioTracks = tracks.filter { $0.kind == .audio }
+                subtitleTracks = tracks.filter { $0.kind == .sub }
+            case let .chapters(list):
+                chapters = list
             }
         }
-        if tracksChanged { reloadTracks() }
-        if chaptersChanged { reloadChapters() }
     }
 
     private func selectPreferredSubtitle() {
@@ -334,30 +331,4 @@ public final class PlayerModel {
         addSubtitle(subtitle, select: true)
     }
 
-    private func reloadTracks() {
-        let list = controller.json("track-list") as? [[String: Any]] ?? []
-        let tracks = list.compactMap { entry -> MediaTrack? in
-            guard let id = entry["id"] as? Int, let type = entry["type"] as? String, let kind = MediaTrack.Kind(rawValue: type) else { return nil }
-            return MediaTrack(
-                id: id,
-                kind: kind,
-                title: entry["title"] as? String,
-                language: entry["lang"] as? String,
-                codec: entry["codec"] as? String,
-                channels: entry["demux-channel-count"] as? Int,
-                isExternal: entry["external"] as? Bool ?? false,
-                isDefault: entry["default"] as? Bool ?? false
-            )
-        }
-        audioTracks = tracks.filter { $0.kind == .audio }
-        subtitleTracks = tracks.filter { $0.kind == .sub }
-    }
-
-    private func reloadChapters() {
-        let list = controller.json("chapter-list") as? [[String: Any]] ?? []
-        chapters = list.compactMap { entry in
-            guard let time = entry["time"] as? Double else { return nil }
-            return Chapter(title: entry["title"] as? String ?? "", time: time)
-        }
-    }
 }

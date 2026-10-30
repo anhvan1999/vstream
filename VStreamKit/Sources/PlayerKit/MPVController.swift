@@ -51,6 +51,8 @@ enum MPVEvent: Sendable {
     case playbackRestart
     case endFile(error: String?)
     case log(String)
+    case tracks([MediaTrack])
+    case chapters([Chapter])
 }
 
 /// Owns the mpv handle. The libmpv client API is thread-safe; events are drained on a private queue
@@ -188,21 +190,27 @@ final class MPVController: @unchecked Sendable {
         }
     }
 
+    // Setters are asynchronous: a synchronous mpv call from the main thread can deadlock
+    // against the VO thread, which hops to the main thread to toggle EDR on the layer.
+
     func set(_ name: String, _ value: String) {
         guard let handle else { return }
-        mpv_set_property_string(handle, name, value)
+        value.withCString { pointer in
+            var string: UnsafePointer<CChar>? = pointer
+            _ = mpv_set_property_async(handle, 0, name, MPV_FORMAT_STRING, &string)
+        }
     }
 
     func set(_ name: String, flag: Bool) {
         guard let handle else { return }
         var value: Int32 = flag ? 1 : 0
-        mpv_set_property(handle, name, MPV_FORMAT_FLAG, &value)
+        mpv_set_property_async(handle, 0, name, MPV_FORMAT_FLAG, &value)
     }
 
     func set(_ name: String, double: Double) {
         guard let handle else { return }
         var value = double
-        mpv_set_property(handle, name, MPV_FORMAT_DOUBLE, &value)
+        mpv_set_property_async(handle, 0, name, MPV_FORMAT_DOUBLE, &value)
     }
 
     /// Sets a string-list property without relying on comma escaping.
@@ -222,21 +230,39 @@ final class MPVController: @unchecked Sendable {
                 var node = mpv_node()
                 node.format = MPV_FORMAT_NODE_ARRAY
                 node.u.list = listPointer
-                mpv_set_property(handle, name, MPV_FORMAT_NODE, &node)
+                mpv_set_property_async(handle, 0, name, MPV_FORMAT_NODE, &node)
             }
         }
     }
 
-    func string(_ name: String) -> String? {
-        guard let handle, let value = mpv_get_property_string(handle, name) else { return nil }
+    /// Synchronous read; only call from `eventQueue`, never the main thread.
+    private func json(_ handle: OpaquePointer, _ name: String) -> Any? {
+        guard let value = mpv_get_property_string(handle, name) else { return nil }
         defer { mpv_free(value) }
-        return String(cString: value)
+        return try? JSONSerialization.jsonObject(with: Data(String(cString: value).utf8))
     }
 
-    /// Node properties (track-list, chapter-list) formatted by mpv as JSON.
-    func json(_ name: String) -> Any? {
-        guard let string = string(name), let data = string.data(using: .utf8) else { return nil }
-        return try? JSONSerialization.jsonObject(with: data)
+    private func readTracks(_ handle: OpaquePointer) -> [MediaTrack] {
+        (json(handle, "track-list") as? [[String: Any]] ?? []).compactMap { entry in
+            guard let id = entry["id"] as? Int, let type = entry["type"] as? String, let kind = MediaTrack.Kind(rawValue: type) else { return nil }
+            return MediaTrack(
+                id: id,
+                kind: kind,
+                title: entry["title"] as? String,
+                language: entry["lang"] as? String,
+                codec: entry["codec"] as? String,
+                channels: entry["demux-channel-count"] as? Int,
+                isExternal: entry["external"] as? Bool ?? false,
+                isDefault: entry["default"] as? Bool ?? false
+            )
+        }
+    }
+
+    private func readChapters(_ handle: OpaquePointer) -> [Chapter] {
+        (json(handle, "chapter-list") as? [[String: Any]] ?? []).compactMap { entry in
+            guard let time = entry["time"] as? Double else { return nil }
+            return Chapter(title: entry["title"] as? String ?? "", time: time)
+        }
     }
 
     // MARK: Events
@@ -275,6 +301,15 @@ final class MPVController: @unchecked Sendable {
                     break
                 }
             }
+            let names = Set(events.compactMap { event -> String? in
+                switch event {
+                case .fileLoaded: "loaded"
+                case let .property(name, _): name
+                default: nil
+                }
+            })
+            if !names.isDisjoint(with: ["loaded", "track-list/count"]) { events.append(.tracks(self.readTracks(handle))) }
+            if !names.isDisjoint(with: ["loaded", "chapter-list/count"]) { events.append(.chapters(self.readChapters(handle))) }
             if !events.isEmpty { self.onEvents(events) }
         }
     }

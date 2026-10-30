@@ -90,6 +90,16 @@ struct RootView: View {
 private struct AccountBadge: View {
     @Environment(AppModel.self) private var app
 
+    private var status: String {
+        if app.stremio.isSyncing { return "Syncing…" }
+        switch (app.stremio.isSignedIn, app.trakt.isConnected) {
+        case (true, true): return "Stremio · Trakt"
+        case (true, false): return "Stremio"
+        case (false, true): return "Local library · Trakt"
+        case (false, false): return "Local library"
+        }
+    }
+
     var body: some View {
         SettingsLink {
             HStack(spacing: 8) {
@@ -99,7 +109,7 @@ private struct AccountBadge: View {
                     Text(app.stremio.session?.user.email ?? "Not signed in")
                         .font(.caption.weight(.medium))
                         .lineLimit(1)
-                    Text(app.stremio.isSyncing ? "Syncing…" : app.trakt.isConnected ? "Stremio · Trakt" : "Local library")
+                    Text(status)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

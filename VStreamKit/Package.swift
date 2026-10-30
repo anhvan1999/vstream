@@ -41,6 +41,10 @@ let package = Package(
             resources: [.copy("Fixtures")]
         ),
         .testTarget(
+            name: "StremioAPITests",
+            dependencies: ["StremioAPI", "AddonKit"]
+        ),
+        .testTarget(
             name: "TraktKitTests",
             dependencies: ["TraktKit"]
         ),
