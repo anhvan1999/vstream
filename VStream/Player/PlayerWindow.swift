@@ -101,6 +101,13 @@ private struct PlayerScreen: View {
         .onFullScreenChange { fullScreen, window in
             isFullScreen = fullScreen
             hostWindow.window = window
+            // Keyboard focus is lost across the full-screen transition; take it back so
+            // Space/F/Esc keep working.
+            focused = true
+            if !fullScreen, let aspect = player.videoAspect { fitWindow(to: aspect) }
+        }
+        .onChange(of: player.videoAspect) { _, aspect in
+            if let aspect, !isFullScreen { fitWindow(to: aspect) }
         }
         // Dragging produces no hover events; keep the controls up while scrubbing.
         .onChange(of: isScrubbing) { revealControls() }
@@ -341,8 +348,37 @@ private struct PlayerScreen: View {
         }
     }
 
+    /// Matches the window to the video so it opens without black bars, and keeps that ratio
+    /// while resizing. The width stays; the height follows (clamped to the screen).
+    private func fitWindow(to aspect: Double) {
+        guard let window = hostWindow.window, !window.styleMask.contains(.fullScreen) else { return }
+        let ratio = NSSize(width: aspect, height: 1)
+        window.contentAspectRatio = ratio
+        var frame = window.frame
+        let content = window.contentRect(forFrameRect: frame)
+        let visible = window.screen?.visibleFrame ?? frame
+        var width = content.width
+        var height = (width / aspect).rounded()
+        if height > visible.height * 0.95 {
+            height = (visible.height * 0.95).rounded()
+            width = (height * aspect).rounded()
+        }
+        guard abs(height - content.height) > 1 || abs(width - content.width) > 1 else { return }
+        let newFrame = window.frameRect(forContentRect: NSRect(x: content.minX, y: content.maxY - height, width: width, height: height))
+        frame = newFrame
+        if frame.minY < visible.minY { frame.origin.y = visible.minY }
+        window.setFrame(frame, display: true, animate: true)
+    }
+
     private func toggleFullScreen() {
-        (hostWindow.window ?? NSApp.keyWindow)?.toggleFullScreen(nil)
+        let window = hostWindow.window ?? NSApp.keyWindow
+        // AppKit ignores toggleFullScreen without .fullScreenPrimary, which SwiftUI may have dropped.
+        window?.collectionBehavior.remove([.fullScreenNone, .fullScreenAuxiliary])
+        window?.collectionBehavior.insert(.fullScreenPrimary)
+        #if DEBUG
+        FileHandle.standardError.write(Data("[debug] toggleFullScreen fs=\(window?.styleMask.contains(.fullScreen) ?? false) behavior=\(window?.collectionBehavior.rawValue ?? 0)\n".utf8))
+        #endif
+        window?.toggleFullScreen(nil)
     }
 
     private func cycle(_ tracks: [MediaTrack], selected: Int?, allowOff: Bool, select: (Int?) -> Void) {

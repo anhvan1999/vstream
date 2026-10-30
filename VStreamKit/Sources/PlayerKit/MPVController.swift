@@ -83,6 +83,7 @@ final class MPVController: @unchecked Sendable {
         ("chapter-list/count", MPV_FORMAT_INT64),
         ("hwdec-current", MPV_FORMAT_STRING),
         ("video-params/sig-peak", MPV_FORMAT_DOUBLE),
+        ("video-params/aspect", MPV_FORMAT_DOUBLE),
     ]
 
     init(onEvents: @escaping @Sendable ([MPVEvent]) -> Void) {

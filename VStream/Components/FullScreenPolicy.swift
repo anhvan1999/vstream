@@ -1,31 +1,41 @@
 import AppKit
 import SwiftUI
 
-/// Sets whether the hosting window may enter full screen. SwiftUI configures
-/// `collectionBehavior` after the view joins the window, so the policy is applied on the next
-/// run-loop turn and re-applied whenever the window becomes key.
+/// Sets whether the hosting window may enter full screen. SwiftUI rewrites `collectionBehavior`
+/// after the view joins the window and again around full-screen transitions (it dropped
+/// `.fullScreenPrimary` while the player was full screen, disabling the green button and
+/// `toggleFullScreen`), so the policy is re-applied on key, resize and full-screen changes.
 private struct FullScreenPolicy: NSViewRepresentable {
     let allowed: Bool
 
     final class PolicyView: NSView {
         var allowed = true
-        private var token: NSObjectProtocol?
+        private var tokens: [NSObjectProtocol] = []
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            if let token { NotificationCenter.default.removeObserver(token) }
-            token = nil
+            tokens.forEach(NotificationCenter.default.removeObserver)
+            tokens = []
             guard let window else { return }
             DispatchQueue.main.async { [weak self] in self?.apply() }
-            token = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.apply() }
+            let names: [Notification.Name] = [
+                NSWindow.didBecomeKeyNotification,
+                NSWindow.didResizeNotification,
+                NSWindow.didEnterFullScreenNotification,
+                NSWindow.didExitFullScreenNotification,
+            ]
+            tokens = names.map { name in
+                NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                    // Next turn: SwiftUI updates the window after these notifications too.
+                    DispatchQueue.main.async { self?.apply() }
+                }
             }
         }
 
         func apply() {
             guard let window else { return }
             if allowed {
-                window.collectionBehavior.remove(.fullScreenNone)
+                window.collectionBehavior.remove([.fullScreenNone, .fullScreenAuxiliary])
                 window.collectionBehavior.insert(.fullScreenPrimary)
             } else {
                 if window.styleMask.contains(.fullScreen) { window.toggleFullScreen(nil) }
@@ -35,7 +45,7 @@ private struct FullScreenPolicy: NSViewRepresentable {
         }
 
         isolated deinit {
-            if let token { NotificationCenter.default.removeObserver(token) }
+            tokens.forEach(NotificationCenter.default.removeObserver)
         }
     }
 

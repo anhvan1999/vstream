@@ -108,6 +108,8 @@ public final class PlayerModel {
     public private(set) var subtitleDelay: Double = 0
     public private(set) var chapters: [Chapter] = []
     public private(set) var hardwareDecoder: String?
+    /// Display aspect ratio (width / height) of the current video.
+    public private(set) var videoAspect: Double?
     public private(set) var errorMessage: String?
 
     public var isPlaying: Bool { !isPaused && !isEnded }
@@ -305,6 +307,8 @@ public final class PlayerModel {
                 case ("sid", .none), ("sid", .string): selectedSubtitleID = nil
                 case let ("sub-delay", .double(value)): subtitleDelay = value
                 case let ("hwdec-current", .string(value)): hardwareDecoder = value == "no" ? nil : value
+                case let ("video-params/aspect", .double(value)) where value > 0.2 && value < 5:
+                    if abs((videoAspect ?? 0) - value) > 0.01 { videoAspect = value }
                 default: break
                 }
             case .fileLoaded:
