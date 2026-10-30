@@ -12,13 +12,17 @@ engine_framework="${engine_root}/platform/apple/NuvioEngine.xcframework"
 mpvkit_root="${VSTREAM_MPVKIT_ROOT:-${parent_root}/MPVKit}"
 
 clone_if_missing() {
-    local path="$1" url="$2"
+    local path="$1" url="$2" branch="${3:-}"
     if [[ ! -d "${path}/.git" ]]; then
-        git clone --depth 1 "${url}" "${path}"
+        git clone --depth 1 ${branch:+--branch "${branch}"} "${url}" "${path}"
     fi
 }
 
-clone_if_missing "${mpvkit_root}" https://github.com/mpvkit/MPVKit.git
+# MPVKit: Nuvio's fork, whose moltenvk context tracks the layer's drawableSize. Upstream only
+# reads it when a file starts, so the picture stayed at the old size after resizing or entering
+# full screen.
+
+clone_if_missing "${mpvkit_root}" https://github.com/NuvioMedia/MPVKit.git Nuvio
 clone_if_missing "${engine_root}" https://github.com/NuvioMedia/nuvio-engine.git
 
 if [[ ! -f "${engine_framework}/macos-arm64_x86_64/libCNuvioEngine.a" ]]; then

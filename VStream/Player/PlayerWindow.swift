@@ -31,6 +31,7 @@ private struct PlayerScreen: View {
     let session: PlaybackSession
 
     @State private var controlsVisible = true
+    @State private var isFullScreen = false
     @State private var hideTask: Task<Void, Never>?
     @FocusState private var focused: Bool
 
@@ -91,6 +92,9 @@ private struct PlayerScreen: View {
             return .handled
         }
         .navigationTitle(session.title)
+        // Only the player window may enter full screen, so these notifications are about it.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in isFullScreen = true }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in isFullScreen = false }
     }
 
     // MARK: Overlays
@@ -176,11 +180,21 @@ private struct PlayerScreen: View {
             if let stats = session.torrentStats {
                 TorrentStatsChip(stats: stats)
             }
+            if isFullScreen {
+                Button {
+                    toggleFullScreen()
+                } label: {
+                    Label("Exit Full Screen", systemImage: "arrow.down.right.and.arrow.up.left")
+                        .font(.callout.weight(.medium))
+                }
+                .buttonStyle(.glass)
+                .help("Exit full screen (Esc)")
+            }
             if let source = session.source {
                 SourceChip(source: source, hardwareDecoder: player.hardwareDecoder)
             }
         }
-        .padding(.top, 38)
+        .padding(.top, isFullScreen ? 16 : 38)
     }
 
     private var bottomBar: some View {
@@ -209,7 +223,8 @@ private struct PlayerScreen: View {
                         subtitleMenu
                         if player.audioTracks.count > 1 { audioMenu }
                         moreMenu
-                        toolButton("arrow.up.left.and.arrow.down.right", help: "Full screen") { toggleFullScreen() }
+                        toolButton(isFullScreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                                   help: isFullScreen ? "Exit full screen (Esc)" : "Full screen (F)") { toggleFullScreen() }
                     }
                     .padding(.horizontal, 6)
                     .padding(.vertical, 4)
