@@ -1,4 +1,5 @@
 import AddonKit
+import CryptoKit
 import SwiftUI
 import TorrentKit
 import UniformTypeIdentifiers
@@ -243,16 +244,19 @@ struct PlayLinkView: View {
     }
 
     private func remember(_ link: String) {
-        let list = [link] + recents.filter { $0 != link }
-        if let data = try? JSONEncoder().encode(Array(list.prefix(12))) {
+        let list = Array(([link] + recents.filter { $0 != link }).prefix(12))
+        if let data = try? JSONEncoder().encode(list) {
             recentStorage = String(decoding: data, as: UTF8.self)
         }
+        TorrentFileStore.prune(keeping: list)
     }
 
     private func forget(_ link: String) {
-        if let data = try? JSONEncoder().encode(recents.filter { $0 != link }) {
+        let list = recents.filter { $0 != link }
+        if let data = try? JSONEncoder().encode(list) {
             recentStorage = String(decoding: data, as: UTF8.self)
         }
+        TorrentFileStore.prune(keeping: list)
     }
 
     private var recentList: some View {
@@ -260,7 +264,10 @@ struct PlayLinkView: View {
             HStack {
                 Text("Recent").font(.headline)
                 Spacer()
-                Button("Clear") { recentStorage = "[]" }
+                Button("Clear") {
+                    recentStorage = "[]"
+                    TorrentFileStore.prune(keeping: [])
+                }
                     .buttonStyle(.glass)
                     .controlSize(.small)
             }
@@ -362,11 +369,7 @@ struct PlayLinkView: View {
             phase = .working(url.isFileURL ? "Reading torrent file…" : "Downloading torrent file…")
             work = Task {
                 do {
-                    let data: Data = if url.isFileURL {
-                        try Data(contentsOf: url)
-                    } else {
-                        try await URLSession.shared.data(from: url).0
-                    }
+                    let data = try await Self.torrentData(url, link: raw)
                     let contents = try TorrentMetainfo.parse(data)
                     guard !Task.isCancelled else { return }
                     choose(Pick(link: raw, contents: contents, torrentFile: data))
@@ -374,6 +377,24 @@ struct PlayLinkView: View {
                     if !Task.isCancelled { phase = .failed(error.localizedDescription) }
                 }
             }
+        }
+    }
+
+    /// Reads the `.torrent` and keeps a copy; if the original was deleted or the link expired,
+    /// falls back to the copy kept when it was first opened.
+    private static func torrentData(_ url: URL, link: String) async throws -> Data {
+        do {
+            let data = if url.isFileURL {
+                try Data(contentsOf: url)
+            } else {
+                try await URLSession.shared.data(from: url).0
+            }
+            _ = try TorrentMetainfo.parse(data)
+            TorrentFileStore.save(data, for: link)
+            return data
+        } catch {
+            guard let copy = TorrentFileStore.load(link) else { throw error }
+            return copy
         }
     }
 
@@ -413,6 +434,39 @@ struct PlayLinkView: View {
         // Not tied to a catalog title, so nothing goes to Continue Watching or Trakt.
         app.play(meta: MetaDetail(preview: preview), video: nil, stream: stream, recordsProgress: false, torrentFile: torrentFile)
         openWindow(id: "player")
+    }
+}
+
+/// Copies of opened `.torrent` files, keyed by the link they were opened from, so Recent still
+/// plays them after the original is deleted or its download link expires. Pruned with Recent.
+enum TorrentFileStore {
+    private static var directory: URL? {
+        let base = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        return base?.appending(path: "VStream/TorrentFiles", directoryHint: .isDirectory)
+    }
+
+    private static func file(for link: String) -> URL? {
+        let key = SHA256.hash(data: Data(link.utf8)).map { String(format: "%02x", $0) }.joined()
+        return directory?.appending(path: "\(key).torrent")
+    }
+
+    static func save(_ data: Data, for link: String) {
+        guard let directory, let file = file(for: link) else { return }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? data.write(to: file, options: .atomic)
+    }
+
+    static func load(_ link: String) -> Data? {
+        file(for: link).flatMap { try? Data(contentsOf: $0) }
+    }
+
+    static func prune(keeping links: [String]) {
+        guard let directory,
+              let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
+        let kept = Set(links.compactMap { file(for: $0)?.lastPathComponent })
+        for file in files where !kept.contains(file.lastPathComponent) {
+            try? FileManager.default.removeItem(at: file)
+        }
     }
 }
 
