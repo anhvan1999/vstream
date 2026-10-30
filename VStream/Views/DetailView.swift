@@ -204,7 +204,7 @@ struct DetailView: View {
     }
 
     private func episodes(_ meta: MetaDetail) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("Episodes").font(.title2.weight(.semibold))
                 Spacer()
@@ -216,7 +216,10 @@ struct DetailView: View {
                 .labelsHidden()
                 .fixedSize()
             }
-            LazyVStack(spacing: 10) {
+            .padding(.horizontal, 10)
+            .padding(.bottom, 6)
+
+            LazyVStack(spacing: 2) {
                 ForEach(meta.videos(inSeason: season ?? 1)) { video in
                     EpisodeRow(meta: meta, video: video, isSelected: streamTarget?.id == video.id) {
                         streamTarget = StreamTarget(video: video, id: video.id)
@@ -224,6 +227,11 @@ struct DetailView: View {
                 }
             }
         }
+        .padding(14)
+        // One calm surface for the whole list so rows don't sit directly on busy artwork.
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(.white.opacity(0.08)))
+        .environment(\.colorScheme, .dark)
     }
 }
 
@@ -235,50 +243,42 @@ private struct EpisodeRow: View {
     var action: () -> Void
     @State private var isHovering = false
 
+    private static let thumbnailSize = CGSize(width: 192, height: 108)
+
     var body: some View {
         let watched = app.library.isWatched(itemID: meta.id, videoID: video.id)
         let resume = app.library.resumePosition(itemID: meta.id, videoID: video.id)
+        let duration = Double(app.library.items[meta.id]?.state.duration ?? 0) / 1000
+        let progress = resume.flatMap { duration > 0 ? min($0 / duration, 1) : nil }
+
         Button(action: action) {
-            HStack(spacing: 14) {
-                ZStack(alignment: .bottom) {
-                    RemoteImage(url: video.thumbnail ?? meta.preview.background)
-                        .frame(width: 176, height: 99)
-                    if let resume, let duration = app.library.items[meta.id]?.state.duration, duration > 0 {
-                        ProgressView(value: min(resume * 1000 / Double(duration), 1)).padding(.horizontal, 6).padding(.bottom, 4)
-                    }
-                }
-                .clipShape(.rect(cornerRadius: 10))
-                .overlay(alignment: .topTrailing) {
-                    if watched {
-                        Image(systemName: "checkmark.circle.fill")
-                            .symbolRenderingMode(.palette)
-                            .foregroundStyle(.white, .green)
-                            .padding(6)
-                    }
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(video.episode.map { "\($0). " } ?? "")\(video.title.isEmpty ? "Episode" : video.title)")
+            HStack(alignment: .top, spacing: 16) {
+                thumbnail(watched: watched, progress: progress)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    caption(resume: resume, duration: duration)
+                    Text(video.title.isEmpty ? "Episode \(video.episode ?? 0)" : video.title)
                         .font(.headline)
                         .lineLimit(1)
-                    if let released = video.released {
-                        Text(released, format: .dateTime.day().month().year())
-                            .font(.caption)
-                            .foregroundStyle(video.isReleased ? Color.secondary : Color.orange)
-                    }
                     if let overview = video.overview {
-                        Text(overview).font(.callout).foregroundStyle(.secondary).lineLimit(2)
+                        Text(overview)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .frame(maxWidth: 680, alignment: .leading)
                     }
                 }
+                .padding(.top, 4)
                 Spacer(minLength: 0)
             }
+            .opacity(watched && progress == nil ? 0.6 : 1)
             .padding(10)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .background {
-            if isSelected || isHovering {
-                RoundedRectangle(cornerRadius: 14).fill(.fill.tertiary)
-            }
+            RoundedRectangle(cornerRadius: 14)
+                .fill(.white.opacity(isSelected ? 0.12 : isHovering ? 0.07 : 0))
         }
         .onHover { isHovering = $0 }
         .contextMenu {
@@ -286,5 +286,64 @@ private struct EpisodeRow: View {
                 app.library.setWatched(meta: meta.preview, videoID: video.id, !watched, nextVideoID: NextEpisode.after(video.id, in: meta)?.id)
             }
         }
+    }
+
+    /// Fixed-size artwork; progress and the watched mark are overlays so they can't change layout.
+    private func thumbnail(watched: Bool, progress: Double?) -> some View {
+        RemoteImage(url: video.thumbnail ?? meta.preview.background)
+            .frame(width: Self.thumbnailSize.width, height: Self.thumbnailSize.height)
+            .clipShape(.rect(cornerRadius: 10))
+            .overlay(alignment: .bottom) {
+                if let progress {
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(.black.opacity(0.45))
+                            Capsule().fill(.white).frame(width: geometry.size.width * progress)
+                        }
+                    }
+                    .frame(height: 4)
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 7)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if watched && progress == nil {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title3)
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, .green)
+                        .shadow(radius: 2)
+                        .padding(6)
+                }
+            }
+            .overlay {
+                if isHovering {
+                    Image(systemName: "play.fill")
+                        .font(.title2)
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .glassEffect(.regular, in: .circle)
+                }
+            }
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.white.opacity(0.1)))
+    }
+
+    private func caption(resume: Double?, duration: Double) -> some View {
+        HStack(spacing: 6) {
+            if let episode = video.episode {
+                Text("Episode \(episode)")
+            }
+            if let resume, duration > 0 {
+                Text("·")
+                Text("Continue · \(max(Int((duration - resume) / 60), 1)) min left")
+                    .foregroundStyle(.tint)
+            } else if let released = video.released {
+                Text("·")
+                Text(released, format: .dateTime.day().month(.abbreviated).year())
+                    .foregroundStyle(video.isReleased ? Color.secondary : Color.orange)
+            }
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(.secondary)
     }
 }
