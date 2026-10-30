@@ -24,6 +24,7 @@ public enum TorrentMode: String, Codable, Sendable, CaseIterable, Identifiable {
 public struct AppSettings: Codable, Sendable, Hashable {
     public var debridService: DebridService?
     public var torrentMode: TorrentMode = .automatic
+    public var addUncachedToDebrid = true
     public var torrent = TorrentSettings()
     public var hardwareDecoding = true
     /// mpv's in-memory stream buffer (read-ahead), in megabytes.
@@ -41,7 +42,7 @@ public struct AppSettings: Codable, Sendable, Hashable {
     public init() {}
 
     enum CodingKeys: String, CodingKey {
-        case debridService, torrentMode, torrent, hardwareDecoding, streamBufferMB, autoplayNextEpisode, preferredAudioLanguages
+        case debridService, torrentMode, addUncachedToDebrid, torrent, hardwareDecoding, streamBufferMB, autoplayNextEpisode, preferredAudioLanguages
         case preferredSubtitleLanguages, subtitleStyle, showAdultCatalogs, traktClientID, hiddenHomeRows
     }
 
@@ -50,6 +51,7 @@ public struct AppSettings: Codable, Sendable, Hashable {
         let defaults = AppSettings()
         debridService = try? container.decodeIfPresent(DebridService.self, forKey: .debridService)
         torrentMode = (try? container.decode(TorrentMode.self, forKey: .torrentMode)) ?? defaults.torrentMode
+        addUncachedToDebrid = (try? container.decode(Bool.self, forKey: .addUncachedToDebrid)) ?? defaults.addUncachedToDebrid
         torrent = (try? container.decode(TorrentSettings.self, forKey: .torrent)) ?? defaults.torrent
         hardwareDecoding = (try? container.decode(Bool.self, forKey: .hardwareDecoding)) ?? defaults.hardwareDecoding
         streamBufferMB = (try? container.decode(Int.self, forKey: .streamBufferMB)) ?? defaults.streamBufferMB

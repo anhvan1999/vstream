@@ -23,6 +23,8 @@ public enum ResolveOutcome: Sendable {
 
 public enum ResolvePhase: Sendable, Hashable {
     case resolvingDebrid(DebridService)
+    /// Not cached: the torrent was sent to the debrid service to download for next time.
+    case addedToDebrid(DebridService)
     case torrent(TorrentPhase)
 }
 
@@ -49,11 +51,13 @@ public struct EpisodeContext: Sendable, Hashable {
 public enum ResolveError: Error, LocalizedError, Sendable {
     case unplayable
     case debridRequired
+    case queuedOnDebrid(DebridService)
 
     public var errorDescription: String? {
         switch self {
         case .unplayable: "This stream has nothing playable"
         case .debridRequired: "Set up a debrid service in Settings, or allow P2P streaming"
+        case let .queuedOnDebrid(service): "Not cached on \(service.displayName) yet. It was added to your account; play it again once it has downloaded."
         }
     }
 }
@@ -63,11 +67,14 @@ public enum ResolveError: Error, LocalizedError, Sendable {
 public struct StreamResolver: Sendable {
     public var debrid: (any DebridProvider)?
     public var mode: TorrentMode
+    /// Send uncached torrents to the debrid service so the next play is instant.
+    public var addsUncachedToDebrid: Bool
     public var torrent: TorrentStreamer
 
-    public init(debrid: (any DebridProvider)?, mode: TorrentMode, torrent: TorrentStreamer = .shared) {
+    public init(debrid: (any DebridProvider)?, mode: TorrentMode, addsUncachedToDebrid: Bool = false, torrent: TorrentStreamer = .shared) {
         self.debrid = debrid
         self.mode = mode
+        self.addsUncachedToDebrid = addsUncachedToDebrid
         self.torrent = torrent
     }
 
@@ -98,7 +105,14 @@ public struct StreamResolver: Sendable {
                     let link = try await debrid.resolve(request)
                     return .play(ResolvedPlayback(url: link.url, headers: [:], source: .debrid(debrid.service), filename: link.filename))
                 } catch DebridError.notCached where mode == .automatic {
-                    // Fall through to peer-to-peer.
+                    // Stream peer-to-peer now; the debrid service downloads it meanwhile.
+                    if addsUncachedToDebrid {
+                        onPhase(.addedToDebrid(debrid.service))
+                        Task.detached { try? await debrid.startDownload(request) }
+                    }
+                } catch DebridError.notCached where addsUncachedToDebrid {
+                    try await debrid.startDownload(request)
+                    throw ResolveError.queuedOnDebrid(debrid.service)
                 }
             } else if mode == .debridOnly {
                 throw ResolveError.debridRequired

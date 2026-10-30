@@ -94,6 +94,9 @@ public protocol DebridProvider: Sendable {
     /// answer `nil`, meaning "unknown".
     func cachedHashes(_ hashes: [String]) async throws -> Set<String>?
     func resolve(_ request: DebridRequest) async throws -> DebridLink
+    /// Adds an uncached torrent to the account so the service downloads it; a later `resolve`
+    /// then finds it cached.
+    func startDownload(_ request: DebridRequest) async throws
 }
 
 // MARK: - Shared HTTP

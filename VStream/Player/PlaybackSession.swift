@@ -92,7 +92,12 @@ final class PlaybackSession: Identifiable {
         tasks.append(Task {
             do {
                 let outcome = try await resolver.resolve(stream, context: context, torrentFile: torrentFile) { phase in
-                    Task { @MainActor [weak self] in self?.stage = .resolving(Self.describe(phase)) }
+                    Task { @MainActor [weak self] in
+                        if case let .addedToDebrid(service) = phase {
+                            Self.log.notice("not cached; added to \(service.displayName, privacy: .public)")
+                        }
+                        self?.stage = .resolving(Self.describe(phase))
+                    }
                 }
                 switch outcome {
                 case let .openExternally(url):
@@ -250,6 +255,7 @@ final class PlaybackSession: Identifiable {
     static func describe(_ phase: ResolvePhase) -> String {
         switch phase {
         case let .resolvingDebrid(service): "Resolving with \(service.displayName)"
+        case let .addedToDebrid(service): "Not cached · added to \(service.displayName) for next time"
         case .torrent(.startingEngine): "Starting torrent engine"
         case .torrent(.fetchingMetadata): "Fetching torrent metadata"
         case let .torrent(.preparingFile(name)): "Preparing \(name)"

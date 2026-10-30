@@ -130,11 +130,17 @@ private struct DebridSettings: View {
             } footer: {
                 Text("Torrent streams are resolved to fast HTTP links through your debrid account when cached.")
             }
-            Section("Torrent streams") {
+            Section {
                 Picker("Play torrents with", selection: $settings.settings.torrentMode) {
                     ForEach(TorrentMode.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.radioGroup)
+                Toggle("Add uncached torrents to my debrid account", isOn: $settings.settings.addUncachedToDebrid)
+                    .disabled(settings.settings.torrentMode == .peerToPeerOnly)
+            } header: {
+                Text("Torrent streams")
+            } footer: {
+                Text("When a torrent isn't cached, it is sent to your debrid service to download while it plays peer-to-peer, so next time it starts instantly.")
             }
         }
         .formStyle(.grouped)

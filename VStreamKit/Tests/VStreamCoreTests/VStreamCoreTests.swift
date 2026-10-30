@@ -12,6 +12,13 @@ private struct MockDebrid: DebridProvider {
     func validate() async throws -> Bool { true }
     func cachedHashes(_ hashes: [String]) async throws -> Set<String>? { [] }
     func resolve(_ request: DebridRequest) async throws -> DebridLink { try result.get() }
+    func startDownload(_ request: DebridRequest) async throws { await downloads.add(request.infoHash) }
+    let downloads = Downloads()
+}
+
+private actor Downloads {
+    var hashes: [String] = []
+    func add(_ hash: String) { hashes.append(hash) }
 }
 
 @Suite struct ResolverTests {
@@ -31,6 +38,13 @@ private struct MockDebrid: DebridProvider {
         guard case let .play(playback) = try await resolver.resolve(torrent, context: .init()) else { Issue.record("expected play"); return }
         #expect(playback.source == .debrid(.torbox))
         #expect(playback.url == link.url)
+    }
+
+    @Test func debridOnlyQueuesUncachedTorrent() async {
+        let debrid = MockDebrid(result: .failure(.notCached))
+        let resolver = StreamResolver(debrid: debrid, mode: .debridOnly, addsUncachedToDebrid: true)
+        await #expect(throws: ResolveError.self) { try await resolver.resolve(torrent, context: .init()) }
+        #expect(await debrid.downloads.hashes == [torrent.infoHash])
     }
 
     @Test func debridOnlyFailsWhenNotCached() async {

@@ -109,7 +109,11 @@ final class AppModel {
     }
 
     var resolver: StreamResolver {
-        StreamResolver(debrid: settings.debridProvider, mode: settings.settings.torrentMode)
+        StreamResolver(
+            debrid: settings.debridProvider,
+            mode: settings.settings.torrentMode,
+            addsUncachedToDebrid: settings.settings.addUncachedToDebrid
+        )
     }
 }
 

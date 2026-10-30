@@ -67,6 +67,21 @@ public struct RealDebridProvider: DebridProvider {
         return DebridLink(url: download, filename: unrestricted["filename"] as? String, size: unrestricted.int64("filesize"))
     }
 
+    public func startDownload(_ request: DebridRequest) async throws {
+        let added = try await http.jsonObject(base.appending(path: "torrents/addMagnet"), method: "POST", form: [("magnet", request.magnet)])
+        guard let id = added["id"] as? String else { throw DebridError.api("Real-Debrid did not accept the magnet") }
+        let info = try await waitForFiles(id)
+        let files = (info["files"] as? [[String: Any]] ?? []).compactMap { file -> DebridFile? in
+            guard let fileID = file.int("id"), let path = file["path"] as? String else { return nil }
+            return DebridFile(id: String(fileID), path: path, size: file.int64("bytes") ?? 0)
+        }
+        // Only the file being watched, so a season pack doesn't download in full.
+        let selection = DebridFileSelector.select(files, request: request)?.id ?? "all"
+        if info["status"] as? String == "waiting_files_selection" {
+            _ = try await http.request(base.appending(path: "torrents/selectFiles/\(id)"), method: "POST", form: [("files", selection)])
+        }
+    }
+
     private func waitForFiles(_ id: String) async throws -> [String: Any] {
         for _ in 0..<20 {
             let info = try await http.jsonObject(base.appending(path: "torrents/info/\(id)"))
@@ -157,6 +172,21 @@ public struct TorboxProvider: DebridProvider {
         return DebridLink(url: url, filename: selected.basename, size: selected.size)
     }
 
+    public func startDownload(_ request: DebridRequest) async throws {
+        do {
+            let created = try await http.jsonObject(
+                base.appending(path: "torrents/createtorrent"),
+                method: "POST",
+                multipart: [("magnet", request.magnet), ("allow_zip", "false")]
+            )
+            guard created["success"] as? Bool != false else {
+                throw DebridError.api(created["detail"] as? String ?? "TorBox rejected the torrent")
+            }
+        } catch let DebridError.api(message) where message.range(of: "already", options: .caseInsensitive) != nil {
+            // Already in the account (e.g. still downloading from an earlier play).
+        }
+    }
+
     private static func isNotCached(_ message: String) -> Bool {
         message == "DOWNLOAD_NOT_CACHED" || message.range(of: "not cached", options: .caseInsensitive) != nil
     }
@@ -199,5 +229,12 @@ public struct PremiumizeProvider: DebridProvider {
             throw DebridError.noPlayableFile
         }
         return DebridLink(url: url, filename: selected.basename, size: selected.size)
+    }
+
+    public func startDownload(_ request: DebridRequest) async throws {
+        let response = try await http.jsonObject(base.appending(path: "transfer/create"), method: "POST", form: [("src", request.magnet)])
+        guard response["status"] as? String == "success" else {
+            throw DebridError.api(response["message"] as? String ?? "Premiumize did not accept the torrent")
+        }
     }
 }
