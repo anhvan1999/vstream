@@ -139,7 +139,7 @@ private struct ToolbarSearch: ViewModifier {
         @Bindable var app = app
         content
             .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
-            .searchable(text: $app.searchText, placement: .toolbar, prompt: "Movies, shows, channels")
+            .searchable(text: $app.searchText, placement: .toolbarPrincipal, prompt: "Movies, shows, channels")
             .searchFocused($focused)
             .onAppear { focused = true }
     }

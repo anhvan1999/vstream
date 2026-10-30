@@ -1,33 +1,47 @@
 import AppKit
 import SwiftUI
 
-/// Tracks whether the hosting window is in full screen.
+/// Tracks whether the hosting window is in full screen. Observation starts once the view is
+/// actually in a window (it usually isn't yet when `makeNSView` runs).
 private struct FullScreenObserver: NSViewRepresentable {
     @Binding var isFullScreen: Bool
 
-    final class Coordinator {
-        var tokens: [NSObjectProtocol] = []
-        deinit { tokens.forEach(NotificationCenter.default.removeObserver) }
+    final class ObservingView: NSView {
+        var onChange: ((Bool) -> Void)?
+        private var tokens: [NSObjectProtocol] = []
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            tokens.forEach(NotificationCenter.default.removeObserver)
+            tokens = []
+            guard let window else { return }
+            onChange?(window.styleMask.contains(.fullScreen))
+            let center = NotificationCenter.default
+            tokens = [
+                center.addObserver(forName: NSWindow.willEnterFullScreenNotification, object: window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.onChange?(true) }
+                },
+                center.addObserver(forName: NSWindow.willExitFullScreenNotification, object: window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.onChange?(false) }
+                },
+            ]
+        }
+
+        isolated deinit { tokens.forEach(NotificationCenter.default.removeObserver) }
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async {
-            guard let window = view.window else { return }
-            isFullScreen = window.styleMask.contains(.fullScreen)
-            let center = NotificationCenter.default
-            let update: (Bool) -> (Notification) -> Void = { value in { _ in isFullScreen = value } }
-            context.coordinator.tokens = [
-                center.addObserver(forName: NSWindow.willEnterFullScreenNotification, object: window, queue: .main, using: update(true)),
-                center.addObserver(forName: NSWindow.didExitFullScreenNotification, object: window, queue: .main, using: update(false)),
-            ]
+    func makeNSView(context: Context) -> ObservingView {
+        let view = ObservingView()
+        view.onChange = { value in
+            #if DEBUG
+            FileHandle.standardError.write(Data("[debug] fullscreen=\(value)\n".utf8))
+            #endif
+            if isFullScreen != value { isFullScreen = value }
         }
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {}
+    func updateNSView(_ nsView: ObservingView, context: Context) {}
 }
 
 extension EnvironmentValues {

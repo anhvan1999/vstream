@@ -19,6 +19,8 @@ struct RootView: View {
                 }
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
+            // In full screen there is no title bar above the list, so give it the same breathing room.
+            .contentMargins(.top, isFullScreen ? 28 : 0, for: .scrollContent)
             .safeAreaInset(edge: .bottom) { AccountBadge().padding(10) }
         } detail: {
             NavigationStack(path: $app.path) {
