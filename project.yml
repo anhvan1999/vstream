@@ -34,8 +34,8 @@ targets:
       path: VStream/Info.plist
       properties:
         CFBundleDisplayName: VStream
-        CFBundleShortVersionString: "0.1.1"
-        CFBundleVersion: "3"
+        CFBundleShortVersionString: "0.1.2"
+        CFBundleVersion: "4"
         LSApplicationCategoryType: public.app-category.entertainment
         LSMinimumSystemVersion: "26.0"
         NSHumanReadableCopyright: "GPL-3.0"
