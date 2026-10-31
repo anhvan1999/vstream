@@ -52,6 +52,17 @@ private actor Downloads {
         await #expect(throws: DebridError.self) { try await resolver.resolve(torrent, context: .init()) }
     }
 
+    @Test func parsesTorrentioDebridLinks() throws {
+        let url = URL(string: "https://torrentio.strem.fun/resolve/torbox/KEY/DD9D6B21CDE411A1AB590D83746858CF5F91081E/Show.S02E07.mkv/6/Show.S02E07.mkv")!
+        let link = try #require(AddonDebridLink(url))
+        #expect(link.service == .torbox)
+        #expect(link.infoHash == "dd9d6b21cde411a1ab590d83746858cf5f91081e")
+        #expect(link.fileIndex == 6)
+        #expect(link.filename == "Show.S02E07.mkv")
+        #expect(AddonDebridLink(URL(string: "https://cdn.example/resolve/movie.mkv")!) == nil)
+        #expect(AddonDebridLink(URL(string: "https://cdn.example/v.mkv")!) == nil)
+    }
+
     @Test func debridOnlyFailsWhenNotCached() async {
         let resolver = StreamResolver(debrid: MockDebrid(result: .failure(.notCached)), mode: .debridOnly)
         await #expect(throws: DebridError.self) { try await resolver.resolve(torrent, context: .init()) }

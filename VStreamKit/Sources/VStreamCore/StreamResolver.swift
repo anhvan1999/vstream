@@ -54,11 +54,13 @@ public enum ResolveError: Error, LocalizedError, Sendable {
     case unplayable
     case debridRequired
     case queuedOnDebrid(DebridService)
+    case addonDebridFailed(DebridService)
 
     public var errorDescription: String? {
         switch self {
         case .unplayable: "This stream has nothing playable"
         case .debridRequired: "Set up a debrid service in Settings, or allow P2P streaming"
+        case let .addonDebridFailed(service): "\(service.displayName) couldn't serve this stream. Allow peer-to-peer in Settings → Debrid to fall back to the torrent."
         case let .queuedOnDebrid(service): "Not cached on \(service.displayName) yet. It was added to your account; play it again once it has downloaded."
         }
     }
@@ -89,6 +91,11 @@ public struct StreamResolver: Sendable {
         onPhase: @escaping @Sendable (ResolvePhase) -> Void = { _ in }
     ) async throws -> ResolveOutcome {
         if let url = stream.url {
+            // A debrid link made by the addon's server (Torrentio's /resolve/…) is still a torrent:
+            // P2P-only mode streams it directly, and Automatic falls back to it when the link fails.
+            if let link = AddonDebridLink(url) {
+                return try await resolve(link, stream: stream, onPhase: onPhase)
+            }
             return .play(ResolvedPlayback(url: url, headers: stream.behaviorHints.requestHeaders, source: .direct, filename: stream.behaviorHints.filename))
         }
 
@@ -140,6 +147,90 @@ public struct StreamResolver: Sendable {
             return .openExternally(url)
         }
         throw ResolveError.unplayable
+    }
+}
+
+extension StreamResolver {
+    private func resolve(
+        _ link: AddonDebridLink,
+        stream: AddonStream,
+        onPhase: @escaping @Sendable (ResolvePhase) -> Void
+    ) async throws -> ResolveOutcome {
+        let filename = stream.behaviorHints.filename ?? link.filename
+        let headers = stream.behaviorHints.requestHeaders
+        if mode != .peerToPeerOnly {
+            onPhase(.resolvingDebrid(link.service))
+            switch await link.probe(headers: headers) {
+            case let .playable(finalURL):
+                return .play(ResolvedPlayback(url: finalURL, headers: headers, source: .debrid(link.service), filename: filename))
+            case .failed where mode == .debridOnly:
+                throw ResolveError.addonDebridFailed(link.service)
+            case .failed:
+                onPhase(.debridUnavailable(link.service))
+            }
+        }
+        let magnet = Magnet.uri(infoHash: link.infoHash, name: filename, trackers: [])
+        let playback = try await torrent.prepare(magnet: magnet, fileIndex: link.fileIndex, filenameHint: filename) { phase in
+            onPhase(.torrent(phase))
+        }
+        return .play(ResolvedPlayback(url: playback.url, headers: [:], source: .peerToPeer, filename: playback.fileName))
+    }
+}
+
+/// A debrid link produced by an addon's server, e.g. Torrentio's
+/// `/resolve/{service}/{key}/{infoHash}/{name}/{fileIdx}/{filename}`, which redirects to the debrid
+/// CDN. It carries the torrent it came from, so the app can stream that peer-to-peer instead.
+public struct AddonDebridLink: Sendable, Hashable {
+    public var url: URL
+    public var service: DebridService
+    public var infoHash: String
+    public var fileIndex: Int?
+    public var filename: String?
+
+    public init?(_ url: URL) {
+        let parts = url.path.split(separator: "/").map(String.init)
+        guard let resolve = parts.firstIndex(of: "resolve"), parts.count > resolve + 3,
+              let service = Self.service(parts[resolve + 1]) else { return nil }
+        let hash = parts[resolve + 3].lowercased()
+        guard hash.count == 40, hash.allSatisfy(\.isHexDigit) else { return nil }
+        self.url = url
+        self.service = service
+        infoHash = hash
+        fileIndex = parts.count > resolve + 5 ? Int(parts[resolve + 5]) : nil
+        filename = parts.count > resolve + 6 ? parts[resolve + 6] : nil
+    }
+
+    private static func service(_ name: String) -> DebridService? {
+        switch name.lowercased() {
+        case "torbox": .torbox
+        case "realdebrid", "real-debrid": .realDebrid
+        case "premiumize": .premiumize
+        default: nil
+        }
+    }
+
+    enum Probe: Sendable {
+        case playable(URL)
+        case failed
+    }
+
+    /// Follows the redirects for the first bytes only. A dead CDN, an HTTP error or one of the
+    /// addon's placeholder videos (`/videos/failed_…`, `downloading…`) counts as failed.
+    func probe(headers: [String: String], timeout: TimeInterval = 15) async -> Probe {
+        var request = URLRequest(url: url, timeoutInterval: timeout)
+        request.setValue("bytes=0-1", forHTTPHeaderField: "Range")
+        for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = timeout
+        configuration.timeoutIntervalForResource = timeout
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        guard let (_, response) = try? await session.data(for: request),
+              let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+              let finalURL = http.url else { return .failed }
+        let path = finalURL.path.lowercased()
+        if path.contains("/videos/"), path.contains("failed") || path.contains("downloading") { return .failed }
+        return .playable(finalURL)
     }
 }
 
