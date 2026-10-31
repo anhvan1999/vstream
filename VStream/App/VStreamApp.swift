@@ -32,6 +32,10 @@ struct VStreamApp: App {
                 .keyboardShortcut("f", modifiers: .command)
                 Button("Refresh Addons") { Task { await app.addons.refreshManifests() } }
                     .keyboardShortcut("r", modifiers: .command)
+                Divider()
+                Button("Back") { if !app.path.isEmpty { app.path.removeLast() } }
+                    .keyboardShortcut("[", modifiers: .command)
+                    .disabled(app.path.isEmpty)
             }
             CommandGroup(replacing: .newItem) {
                 Button("Play Link…") { app.showPlayLink() }

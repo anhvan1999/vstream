@@ -44,6 +44,10 @@ private struct PlayerScreen: View {
     @State private var showsSubtitles = false
     @State private var hideTask: Task<Void, Never>?
     @State private var toast: Toast?
+    #if os(iOS)
+    /// How far the player is being swiped down to close it.
+    @State private var dismissDrag: CGFloat = 0
+    #endif
     @State private var toastTask: Task<Void, Never>?
     @FocusState private var focused: Bool
 
@@ -115,6 +119,26 @@ private struct PlayerScreen: View {
         // notch and home indicator while the picture fills the screen.
         #if os(macOS)
         .ignoresSafeArea()
+        #else
+        // Swipe down to close, like the system players: the picture follows the finger and shrinks
+        // a little; past the threshold (or a quick flick) it closes, otherwise it springs back.
+        .offset(y: dismissDrag)
+        .scaleEffect(1 - min(dismissDrag / 2000, 0.12))
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 24)
+                .onChanged { value in
+                    guard !isScrubbing, value.translation.height > 0,
+                          value.translation.height > abs(value.translation.width) else { return }
+                    dismissDrag = value.translation.height
+                }
+                .onEnded { value in
+                    if dismissDrag > 140 || (dismissDrag > 40 && value.predictedEndTranslation.height > 400) {
+                        closePlayer()
+                    } else {
+                        withAnimation(.spring(duration: 0.3)) { dismissDrag = 0 }
+                    }
+                }
+        )
         #endif
         .onContinuousHover { phase in
             if case .active = phase { revealControls() }
@@ -125,6 +149,17 @@ private struct PlayerScreen: View {
         .onAppear {
             focused = true
             revealControls()
+            #if DEBUG
+            // `VSTREAM_DEBUG_SUBPANEL=1` opens the subtitle panel, for checking its layout.
+            if ProcessInfo.processInfo.environment["VSTREAM_DEBUG_SUBPANEL"] == "1" {
+                Task {
+                    // Once the transport bar (and its subtitle button) is up.
+                    while !isReady { try? await Task.sleep(for: .milliseconds(200)) }
+                    try? await Task.sleep(for: .seconds(0.5))
+                    showsSubtitles = true
+                }
+            }
+            #endif
         }
         .onKeyPress(.space) { player.togglePause(); revealControls(); return .handled }
         // ←/→ 10 s, ⇧ 60 s, ⌥ 3 s.
@@ -350,9 +385,16 @@ private struct PlayerScreen: View {
         }
         .buttonStyle(.plain)
         .help("Subtitles")
-        .popover(isPresented: $showsSubtitles, arrowEdge: .top) {
+        .popover(isPresented: $showsSubtitles, arrowEdge: Self.subtitleArrowEdge) {
             SubtitlePanel(player: player)
                 .environment(app)
+                #if os(iOS)
+                // iOS popovers don't size to the columns' fixed widths and came out a sliver.
+                .frame(width: 740, height: 340)
+                .presentationCompactAdaptation(.popover)
+                // Dark popover chrome to match the panel and the player.
+                .preferredColorScheme(.dark)
+                #endif
         }
     }
 
@@ -428,6 +470,14 @@ private struct PlayerScreen: View {
             #endif
         }
     }
+
+    /// iPhone/iPad keep the button at the bottom edge of the screen, so the panel opens above it;
+    /// below it there was only room for a sliver.
+    #if os(macOS)
+    private static let subtitleArrowEdge = Edge.top
+    #else
+    private static let subtitleArrowEdge = Edge.bottom
+    #endif
 
     /// The Mac player is a window that can go full screen; iPhone/iPad always fill the screen.
     #if os(macOS)

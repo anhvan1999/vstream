@@ -125,7 +125,7 @@ xcodebuild -project VStream.xcodeproj -scheme VStream -configuration Release \
 The `VStream-iOS` target (iOS/iPadOS 26) shares the app's source; platform differences sit behind
 `#if os(macOS)` / `os(iOS)`. iPad keeps the sidebar, iPhone gets a tab bar (Addons are in Settings, opened
 with ⚙︎ on Library), and the player is a full-screen cover with touch controls (tap to show or hide them,
-double-tap the left or right half to seek 10 s).
+double-tap the left or right half to seek 10 s, swipe down to close it). Swipe from the left edge to go back.
 
 ```bash
 xcodebuild -project VStream.xcodeproj -scheme VStream-iOS -destination 'generic/platform=iOS Simulator' \
@@ -212,7 +212,7 @@ VStream (SwiftUI app)
 | Where | Keys |
 |---|---|
 | Player | Space play/pause · ←/→ seek 10 s (⌥ 3 s, ⇧ 60 s) · ↑/↓ volume · Z/X subtitle delay ∓0.1 s (⇧ ∓1 s) · F full screen · M mute · S/A cycle subtitles/audio · N next episode · Esc exit full screen |
-| App | ⌘F Search · ⌘L Play Link · ⌘O Open Torrent File · ⌘R Refresh Addons · ⇧⌘R Sync Now · ⌘, Settings |
+| App | ⌘[ Back · ⌘F Search · ⌘L Play Link · ⌘O Open Torrent File · ⌘R Refresh Addons · ⇧⌘R Sync Now · ⌘, Settings |
 
 ## Debugging
 

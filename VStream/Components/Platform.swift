@@ -83,3 +83,18 @@ enum SignInBrowser {
     static func finish() {}
 }
 #endif
+
+#if os(iOS)
+/// Pages hide the navigation bar (they draw their own back button), which also turns off UIKit's
+/// swipe-from-the-edge to go back. Re-enable it whenever there's a page to go back to.
+extension UINavigationController: @retroactive UIGestureRecognizerDelegate {
+    override open func viewDidLoad() {
+        super.viewDidLoad()
+        interactivePopGestureRecognizer?.delegate = self
+    }
+
+    public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        gestureRecognizer == interactivePopGestureRecognizer ? viewControllers.count > 1 : true
+    }
+}
+#endif

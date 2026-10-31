@@ -111,26 +111,17 @@ struct RootView: View {
                     detailStack(content(for: item))
                 }
             }
-            if horizontalSizeClass == .compact {
-                Tab(SidebarItem.search.title, systemImage: SidebarItem.search.symbol, value: Optional(SidebarItem.search), role: .search) {
-                    detailStack(content(for: .search))
-                }
-            } else {
-                // iPad: a plain tab (🔍 in the strip) whose page shows the field under the strip,
-                // like the Apple TV app; the search role would turn the strip itself into a field.
-                Tab(value: Optional(SidebarItem.search)) {
-                    detailStack(content(for: .search))
-                } label: {
-                    Label(SidebarItem.search.title, systemImage: SidebarItem.search.symbol)
-                        .labelStyle(.iconOnly)
-                }
-            }
             // iPad only: four tabs plus Search fill an iPhone tab bar (more would add "More"), so
             // there Addons is reached through Settings (⚙︎ on Library).
             if horizontalSizeClass != .compact {
                 Tab(SidebarItem.addons.title, systemImage: SidebarItem.addons.symbol, value: Optional(SidebarItem.addons)) {
                     detailStack(content(for: .addons))
                 }
+            }
+            // The system search tab: its own spot at the trailing end of the iPad strip (icon only)
+            // and of the iPhone tab bar, "Search" with text in the sidebar.
+            Tab(SidebarItem.search.title, systemImage: SidebarItem.search.symbol, value: Optional(SidebarItem.search), role: .search) {
+                detailStack(content(for: .search))
             }
         }
         .tabViewStyle(.sidebarAdaptable)
