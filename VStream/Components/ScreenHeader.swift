@@ -77,6 +77,9 @@ extension ScreenHeader where Controls == EmptyView {
 /// Floating glass back button used instead of the toolbar's.
 struct BackButton: View {
     @Environment(AppModel.self) private var app
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
 
     var body: some View {
         Button {
@@ -91,6 +94,17 @@ struct BackButton: View {
         .keyboardShortcut("[", modifiers: .command)
         .help("Back")
         .padding(.leading, 22)
-        .padding(.top, 16)
+        .padding(.top, besideTabStrip ? 30 : 16)
+        // iPad: level with the floating tab strip (centred, so its left side is free) rather than
+        // below it, where the top safe area would put it.
+        .ignoresSafeArea(edges: besideTabStrip ? .top : [])
+    }
+
+    private var besideTabStrip: Bool {
+        #if os(iOS)
+        horizontalSizeClass == .regular
+        #else
+        false
+        #endif
     }
 }
