@@ -134,6 +134,8 @@ struct PlayLinkView: View {
                 Image(systemName: "link").foregroundStyle(.secondary)
                 TextField(isCompact ? "https://… or magnet:…" : "https://…  or  magnet:?xt=urn:btih:…", text: $input)
                     .textFieldStyle(.plain)
+                    // The glass capsule is the field; no extra rectangle when it's focused.
+                    .focusEffectDisabled()
                     #if os(iOS)
                     .keyboardType(.URL)
                     .textInputAutocapitalization(.never)

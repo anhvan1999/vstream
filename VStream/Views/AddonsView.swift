@@ -32,6 +32,13 @@ struct AddonsView: View {
                     Image(systemName: "link").foregroundStyle(.secondary)
                     TextField("Paste an addon URL (https://… or stremio://…)", text: $input)
                         .textFieldStyle(.plain)
+                        // The glass capsule is the field; no extra rectangle when it's focused.
+                        .focusEffectDisabled()
+                        #if os(iOS)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        #endif
                         .onSubmit(install)
                     if isInstalling {
                         ProgressView().controlSize(.small)
