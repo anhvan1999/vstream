@@ -13,9 +13,9 @@ struct RootView: View {
         layout
         #if os(macOS)
         .toolbar(removing: .sidebarToggle)
-        // Clear at the top of a page (the Home hero and detail artwork run up under it); the
-        // system fades its background in once content scrolls beneath it.
-        .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
+        // No toolbar background (like the Apple TV app): pages run up to the top edge; pages with
+        // toolbar controls fade content out beneath them (`pageScrollEdge`).
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .toolbar(removing: .title)
         // Only the player goes full screen; the green button zooms this window instead.
         .fullScreenAllowed(false)

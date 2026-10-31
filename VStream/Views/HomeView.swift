@@ -45,7 +45,7 @@ struct HomeView: View {
             }
             .padding(.bottom, 40)
         }
-        .scrollEdgeEffectStyle(.soft, for: .top)
+        .pageScrollEdge()
         // Clamped at 0, so normal scrolling doesn't update state.
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             max(0, -(geometry.contentOffset.y + geometry.contentInsets.top))
@@ -387,6 +387,7 @@ struct CatalogGridView: View {
             }
             if isLoading { ProgressView().padding() }
         }
+        .pageScrollEdge()
         .navigationTitle(row.catalog.name)
         .task(id: "\(row.id)|\(genre ?? "")") {
             metas = []

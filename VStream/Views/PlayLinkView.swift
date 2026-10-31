@@ -67,7 +67,7 @@ struct PlayLinkView: View {
                 .padding(.bottom, 40)
             }
         }
-        .scrollEdgeEffectStyle(.soft, for: .top)
+        .pageScrollEdge()
         .overlay {
             if isDropTargeted {
                 RoundedRectangle(cornerRadius: 22)

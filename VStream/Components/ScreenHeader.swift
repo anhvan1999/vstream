@@ -126,14 +126,29 @@ extension View {
     func pageControls<Controls: View>(@ViewBuilder _ controls: () -> Controls) -> some View {
         #if os(macOS)
         toolbar {
-            // The spacer pushes the group to the trailing end (it would hug the sidebar otherwise).
+            // The spacer pushes the controls to the trailing end (they'd hug the sidebar otherwise).
             ToolbarSpacer(.flexible)
-            ToolbarItemGroup {
-                controls().labelsHidden()
+            // One glass capsule with its own trailing inset, so the controls line up with the page
+            // content (28 pt from the edge) rather than the window edge.
+            ToolbarItem {
+                HStack(spacing: 6) { controls().labelsHidden() }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .glassEffect(.regular, in: .capsule)
+                    .padding(.trailing, 18)
             }
+            .sharedBackgroundVisibility(.hidden)
         }
         #else
         self
         #endif
+    }
+}
+
+extension View {
+    /// The top edge of a scrolling page: content fades out softly under the toolbar controls and
+    /// the floating bars, with no bar background.
+    func pageScrollEdge() -> some View {
+        scrollEdgeEffectStyle(.soft, for: .top)
     }
 }

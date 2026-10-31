@@ -21,6 +21,8 @@ struct VStreamApp: App {
                 .onOpenURL { app.handle(url: $0) }
         }
         .defaultSize(width: 1360, height: 860)
+        // Like the Apple TV app: no title bar; the traffic lights sit over the sidebar and pages
+        // run up to the top edge.
         .windowStyle(.hiddenTitleBar)
         .commands {
             SidebarCommands()

@@ -116,8 +116,7 @@ struct SearchView: View {
             }
             .padding(.vertical, 20)
         }
-        // The toolbar stays clear until content scrolls beneath it, then picks up its glass.
-        .scrollEdgeEffectStyle(.soft, for: .top)
+        .pageScrollEdge()
         .overlay {
             if isSearching && results.isEmpty {
                 ProgressView("Searching…")
@@ -204,6 +203,7 @@ struct LibraryView: View {
                 }
             }
         }
+        .pageScrollEdge()
         .overlay {
             if items.isEmpty {
                 EmptyStateView(title: "Your library is empty", symbol: "books.vertical", message: "Add movies and shows from their detail page.")

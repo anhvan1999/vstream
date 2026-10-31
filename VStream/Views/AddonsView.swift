@@ -58,6 +58,7 @@ struct AddonsView: View {
             }
             .listStyle(.inset)
             .scrollContentBackground(.hidden)
+            .pageScrollEdge()
         }
         .navigationTitle("Addons")
         .pageControls { controls }
@@ -66,14 +67,16 @@ struct AddonsView: View {
     }
 
     @ViewBuilder private var controls: some View {
+        // Icon and text: toolbars would show these as bare icons.
         Button("Browse Community Addons", systemImage: "globe") {
             openURL(URL(string: "https://stremio-addons.net")!)
         }
+        .labelStyle(.titleAndIcon)
         .buttonStyle(.glass)
         Button("Refresh", systemImage: "arrow.clockwise") {
             Task { await app.addons.refreshManifests() }
         }
-        .labelStyle(.iconOnly)
+        .labelStyle(.titleAndIcon)
         .buttonStyle(.glass)
         .disabled(app.addons.isRefreshing)
     }
