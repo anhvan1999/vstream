@@ -156,12 +156,13 @@ public final class TraktAccount {
     }
 
     /// A Trakt list as catalog items; artwork comes from Cinemeta's image CDN by IMDb id.
-    public func items(_ list: List) async throws -> [MetaPreview] {
+    /// `limit` caps recommendations (Trakt serves up to 100); the watchlist is always complete.
+    public func items(_ list: List, limit: Int = 30) async throws -> [MetaPreview] {
         guard isConnected, let client = makeClient() else { return [] }
         let entries: [TraktListItem] = switch list {
         case .watchlist: try await client.watchlist()
-        case .recommendedMovies: try await client.recommendations(.movie)
-        case .recommendedShows: try await client.recommendations(.show)
+        case .recommendedMovies: try await client.recommendations(.movie, limit: limit)
+        case .recommendedShows: try await client.recommendations(.show, limit: limit)
         }
         return entries.map { entry in
             MetaPreview(

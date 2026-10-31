@@ -226,67 +226,97 @@ struct HeroBanner: View {
 
 struct ContinueWatchingShelf: View {
     @Environment(AppModel.self) private var app
-    @Environment(\.openWindow) private var openWindow
-    @State private var resuming: String?
 
     var body: some View {
         let entries = app.library.continueWatching
         if !entries.isEmpty {
             Shelf(title: "Continue Watching") {
-                ForEach(entries) { entry in
-                    Button {
-                        resume(entry)
-                    } label: {
-                        PosterCard(
-                            title: entry.item.name,
-                            poster: entry.item.poster,
-                            width: 150,
-                            subtitle: label(for: entry),
-                            progress: entry.isNextUp ? nil : entry.item.progress
-                        )
-                        .overlay {
-                            if resuming == entry.id {
-                                ProgressView()
-                                    .controlSize(.large)
-                                    .frame(width: 150, height: 225)
-                                    .background(.black.opacity(0.35), in: .rect(cornerRadius: 12))
-                                    .frame(maxHeight: .infinity, alignment: .top)
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .contextMenu {
-                        Button("Details", systemImage: "info.circle") { openDetails(entry) }
-                        Button("Remove from Continue Watching", systemImage: "xmark") {
-                            app.library.removeFromContinueWatching(entry.item.id)
-                        }
-                    }
+                NavigationLink("See All") { ContinueWatchingGridView() }
+                    .buttonStyle(.glass)
+                    .controlSize(.small)
+            } content: {
+                ForEach(entries) { ContinueWatchingCard(entry: $0) }
+            }
+        }
+    }
+}
+
+/// Every title in progress, most recently watched first.
+struct ContinueWatchingGridView: View {
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        let entries = app.library.continueWatching
+        ScrollView {
+            ScreenHeader(title: "Continue Watching", subtitle: "\(entries.count) titles")
+            PosterGrid(items: entries) { ContinueWatchingCard(entry: $0) }
+        }
+        .pageScrollEdge()
+        .overlay {
+            if entries.isEmpty {
+                EmptyStateView(title: "Nothing in progress", symbol: "play.circle", message: "Titles you start watching show up here.")
+            }
+        }
+        .navigationTitle("Continue Watching")
+    }
+}
+
+/// A Continue Watching poster: plays the stream from last time (or the next episode from the
+/// same release); titles without one open their page to pick a stream.
+struct ContinueWatchingCard: View {
+    @Environment(AppModel.self) private var app
+    @Environment(\.openWindow) private var openWindow
+    var entry: ContinueWatchingEntry
+    @State private var isResuming = false
+
+    var body: some View {
+        Button(action: resume) {
+            PosterCard(
+                title: entry.item.name,
+                poster: entry.item.poster,
+                width: 150,
+                subtitle: label,
+                progress: entry.isNextUp ? nil : entry.item.progress
+            )
+            .overlay {
+                if isResuming {
+                    ProgressView()
+                        .controlSize(.large)
+                        .frame(width: 150, height: 225)
+                        .background(.black.opacity(0.35), in: .rect(cornerRadius: 12))
+                        .frame(maxHeight: .infinity, alignment: .top)
                 }
+            }
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button("Details", systemImage: "info.circle", action: openDetails)
+            Button("Remove from Continue Watching", systemImage: "xmark") {
+                app.library.removeFromContinueWatching(entry.item.id)
             }
         }
     }
 
-    /// Plays the stream from last time; titles without one open their page to pick a stream.
-    private func resume(_ entry: ContinueWatchingEntry) {
-        guard resuming == nil else { return }
-        resuming = entry.id
+    private func resume() {
+        guard !isResuming else { return }
+        isResuming = true
         Task {
-            defer { resuming = nil }
+            defer { isResuming = false }
             if await app.resume(entry) {
                 #if os(macOS)
                 openWindow(id: "player")
                 #endif
             } else {
-                openDetails(entry)
+                openDetails()
             }
         }
     }
 
-    private func openDetails(_ entry: ContinueWatchingEntry) {
+    private func openDetails() {
         app.path.append(MetaRoute(type: entry.item.type, id: entry.item.id, preview: nil))
     }
 
-    private func label(for entry: ContinueWatchingEntry) -> String? {
+    private var label: String? {
         let episode = entry.videoID.map(EpisodeContext.init(videoID:))
         if let season = episode?.season, let number = episode?.episode {
             return entry.isNextUp ? "Next: S\(season)E\(number)" : "S\(season)E\(number)"
@@ -353,12 +383,51 @@ struct TraktShelf: View {
     var body: some View {
         if let metas = app.trakt.lists[list], !metas.isEmpty {
             Shelf(title: list.title) {
+                NavigationLink("See All") { TraktListGridView(list: list) }
+                    .buttonStyle(.glass)
+                    .controlSize(.small)
+            } content: {
                 ForEach(metas) { meta in
                     Button { app.open(meta) } label: {
                         PosterCard(title: meta.name, poster: meta.poster, width: 150, subtitle: meta.releaseInfo)
                     }
                     .buttonStyle(.plain)
                 }
+            }
+        }
+    }
+}
+
+/// A whole Trakt list: up to 100 recommendations, or the complete watchlist.
+struct TraktListGridView: View {
+    @Environment(AppModel.self) private var app
+    var list: TraktAccount.List
+    @State private var metas: [MetaPreview]?
+    @State private var error: String?
+
+    var body: some View {
+        ScrollView {
+            ScreenHeader(title: list.title, subtitle: metas.map { "\($0.count) titles" })
+            PosterGrid(items: metas ?? app.trakt.lists[list] ?? []) { meta in
+                Button { app.open(meta) } label: {
+                    PosterCard(title: meta.name, poster: meta.poster, width: 150, subtitle: meta.releaseInfo)
+                }
+                .buttonStyle(.plain)
+            }
+            if metas == nil, error == nil { ProgressView().padding() }
+        }
+        .pageScrollEdge()
+        .overlay {
+            if let error, (metas ?? []).isEmpty {
+                EmptyStateView(title: "Couldn't load", symbol: "exclamationmark.triangle", message: error)
+            }
+        }
+        .navigationTitle(list.title)
+        .task(id: list) {
+            do {
+                metas = try await app.trakt.items(list, limit: 100)
+            } catch {
+                self.error = error.localizedDescription
             }
         }
     }
