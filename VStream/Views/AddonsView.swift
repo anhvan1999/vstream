@@ -58,7 +58,6 @@ struct AddonsView: View {
             }
             .listStyle(.inset)
             .scrollContentBackground(.hidden)
-            .pageScrollEdge()
         }
         .navigationTitle("Addons")
         .pageControls { controls }

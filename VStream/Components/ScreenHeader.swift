@@ -147,9 +147,59 @@ extension View {
 }
 
 extension View {
-    /// The top edge of a scrolling page: content fades out softly under the toolbar controls and
-    /// the floating bars, with no bar background.
+    /// The top edge of a scrolling page: content blurs out softly under the toolbar and the
+    /// floating bars, with no bar background. The Mac window hides its title bar, where the
+    /// system's soft scroll edge isn't drawn, so there a progressive blur fades in once the page
+    /// is scrolled.
     func pageScrollEdge() -> some View {
+        #if os(macOS)
+        modifier(TopScrollBlur())
+        #else
         scrollEdgeEffectStyle(.soft, for: .top)
+        #endif
     }
 }
+
+#if os(macOS)
+private struct TopScrollBlur: ViewModifier {
+    @State private var isScrolled = false
+    /// The toolbar's height, for pages that run up under it (the Home hero ignores the safe area).
+    private static let toolbarHeight: CGFloat = 52
+    /// How far below the toolbar the blur fades out.
+    private static let fade: CGFloat = 28
+
+    func body(content: Content) -> some View {
+        content
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top > 2
+            } action: { _, scrolled in
+                isScrolled = scrolled
+            }
+            .overlay(alignment: .top) {
+                GeometryReader { proxy in
+                    let inset = proxy.safeAreaInsets.top
+                    let height = (inset > 0 ? inset : Self.toolbarHeight) + Self.fade
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        // Full blur behind the toolbar, fading out below it.
+                        .mask {
+                            LinearGradient(
+                                stops: [
+                                    .init(color: .black, location: 0),
+                                    .init(color: .black, location: 1 - Self.fade / height),
+                                    .init(color: .clear, location: 1),
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        }
+                        .frame(height: height)
+                        .offset(y: -inset)
+                        .opacity(isScrolled ? 1 : 0)
+                        .animation(.easeOut(duration: 0.2), value: isScrolled)
+                }
+                .allowsHitTesting(false)
+            }
+    }
+}
+#endif
