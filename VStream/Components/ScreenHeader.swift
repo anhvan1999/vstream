@@ -120,22 +120,23 @@ struct BackButton: View {
 }
 
 extension View {
-    /// The Mac shows a tab page's controls at the trailing end of the window toolbar.
-    /// Applied to the page itself, outside its scroll view, so they stay put while scrolling.
-    /// iPhone/iPad keep them in the page header.
+    /// The Mac shows a tab page's controls centred in the window toolbar, each in its own glass
+    /// capsule. Applied to the page itself, outside its scroll view, so they stay put while
+    /// scrolling. iPhone/iPad keep them in the page header.
     func pageControls<Controls: View>(@ViewBuilder _ controls: () -> Controls) -> some View {
         #if os(macOS)
         toolbar {
-            // The spacer pushes the controls to the trailing end (they'd hug the sidebar otherwise).
-            ToolbarSpacer(.flexible)
-            // One glass capsule with its own trailing inset, so the controls line up with the page
-            // content (28 pt from the edge) rather than the window edge.
-            ToolbarItem {
-                HStack(spacing: 6) { controls().labelsHidden() }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .glassEffect(.regular, in: .capsule)
-                    .padding(.trailing, 18)
+            ToolbarItem(placement: .principal) {
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        // Modifiers on a Group apply to each control separately.
+                        Group { controls() }
+                            .labelsHidden()
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .glassEffect(.regular, in: .capsule)
+                    }
+                }
             }
             .sharedBackgroundVisibility(.hidden)
         }
