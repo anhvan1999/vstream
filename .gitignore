@@ -2,6 +2,8 @@
 build/
 DerivedData/
 .build/
+# Extra SwiftPM scratch paths (swift test --scratch-path .build-…)
+.build-*/
 .swiftpm/
 *.xcodeproj/
 *.xcworkspace/
