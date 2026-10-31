@@ -152,6 +152,8 @@ private actor Downloads {
     let series = MetaPreview(id: "tt0903747", type: "series", name: "Breaking Bad")
     let movie = MetaPreview(id: "tt0816692", type: "movie", name: "Interstellar")
 
+    init() { TestStore.prepare() }
+
     @Test func partialProgressAppearsInContinueWatching() {
         let library = LibraryStore(storageName: "library-tests")
         library.reset()

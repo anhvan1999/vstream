@@ -35,23 +35,37 @@ let package = Package(
             name: "VStreamCore",
             dependencies: ["AddonKit", "StremioAPI", "TraktKit", "DebridKit", "TorrentKit", "PlayerKit"]
         ),
+        // Test helpers (mock HTTP, temporary directories); not part of any product.
+        .target(name: "TestSupport", path: "Tests/TestSupport"),
         .testTarget(
             name: "AddonKitTests",
-            dependencies: ["AddonKit"],
+            dependencies: ["AddonKit", "TestSupport"],
             resources: [.copy("Fixtures")]
         ),
         .testTarget(
             name: "StremioAPITests",
-            dependencies: ["StremioAPI", "AddonKit"],
+            dependencies: ["StremioAPI", "AddonKit", "TestSupport"],
             resources: [.copy("Fixtures")]
         ),
         .testTarget(
             name: "TraktKitTests",
-            dependencies: ["TraktKit"]
+            dependencies: ["TraktKit", "TestSupport"]
+        ),
+        .testTarget(
+            name: "DebridKitTests",
+            dependencies: ["DebridKit", "TestSupport"]
+        ),
+        .testTarget(
+            name: "TorrentKitTests",
+            dependencies: ["TorrentKit"]
+        ),
+        .testTarget(
+            name: "PlayerKitTests",
+            dependencies: ["PlayerKit"]
         ),
         .testTarget(
             name: "VStreamCoreTests",
-            dependencies: ["VStreamCore", "DebridKit", "AddonKit", "StremioAPI"]
+            dependencies: ["VStreamCore", "DebridKit", "AddonKit", "StremioAPI", "TraktKit", "TestSupport"]
         ),
     ]
 )

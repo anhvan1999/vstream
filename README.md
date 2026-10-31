@@ -121,6 +121,20 @@ xcodebuild -project VStream.xcodeproj -scheme VStream -configuration Release \
 (cd VStreamKit && swift test)
 ```
 
+### Tests
+`VStreamKit` has about 430 unit tests (Swift Testing) covering the addon protocol, Stremio and Trakt
+clients, the debrid providers, the library and resolver logic, `.torrent` parsing and link detection. HTTP
+goes through an in-process mock (`Tests/TestSupport/MockHTTP.swift`), and stores write to a temporary
+directory (`VSTREAM_STORE_DIR`), so tests never touch the network, your data or the Keychain.
+
+```bash
+(cd VStreamKit && swift test)
+scripts/coverage.sh          # line coverage per file, merged across test targets (--html for a report)
+```
+
+Code that needs mpv, the torrent engine or the Keychain (player, `TorrentStreamer`, account stores) isn't
+unit-tested.
+
 ### iPhone and iPad
 The `VStream-iOS` target (iOS/iPadOS 26) shares the app's source; platform differences sit behind
 `#if os(macOS)` / `os(iOS)`. iPad keeps the sidebar, iPhone gets a tab bar (Addons are in Settings, opened

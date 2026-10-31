@@ -4,6 +4,12 @@ import Security
 /// Small JSON documents in Application Support. Writes are atomic and happen off the main thread.
 public enum JSONStore {
     static let directory: URL = {
+        // Tests point this at a temporary directory so they never touch the user's data.
+        if let override = ProcessInfo.processInfo.environment["VSTREAM_STORE_DIR"] {
+            let url = URL(filePath: override, directoryHint: .isDirectory)
+            try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            return url
+        }
         let base = (try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true))
             ?? FileManager.default.temporaryDirectory
         let url = base.appending(path: "VStream", directoryHint: .isDirectory)
