@@ -113,14 +113,27 @@ extension Shelf where Accessory == EmptyView {
 }
 
 /// Adaptive poster grid used by Discover, Library and "See all".
+/// Posters packed from the leading edge with the same 16 pt gaps as the Home shelves: columns are
+/// exactly a card wide (adaptive columns stretched to fill the row, leaving wide gaps around the
+/// fixed-width cards).
 struct PosterGrid<Item: Identifiable, Cell: View>: View {
     var items: [Item]
     var minWidth: CGFloat = 150
     var onReachEnd: (() -> Void)?
     @ViewBuilder var cell: (Item) -> Cell
 
+    @State private var width: CGFloat = 0
+    private static var spacing: CGFloat { 16 }
+    private static var inset: CGFloat { 28 }
+
+    private var columns: [GridItem] {
+        let available = max(width - Self.inset * 2, minWidth)
+        let count = max(Int((available + Self.spacing) / (minWidth + Self.spacing)), 1)
+        return Array(repeating: GridItem(.fixed(minWidth), spacing: Self.spacing, alignment: .top), count: count)
+    }
+
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: minWidth, maximum: minWidth + 30), spacing: 18, alignment: .top)], spacing: 22) {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 20) {
             ForEach(items) { item in
                 cell(item)
                     .onAppear {
@@ -128,7 +141,9 @@ struct PosterGrid<Item: Identifiable, Cell: View>: View {
                     }
             }
         }
-        .padding(28)
+        .padding(Self.inset)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
 }
 
