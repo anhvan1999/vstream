@@ -72,12 +72,12 @@ struct AddonsView: View {
             openURL(URL(string: "https://stremio-addons.net")!)
         }
         .labelStyle(.titleAndIcon)
-        .buttonStyle(.glass)
+        .modifier(HeaderButtonStyle())
         Button("Refresh", systemImage: "arrow.clockwise") {
             Task { await app.addons.refreshManifests() }
         }
         .labelStyle(.titleAndIcon)
-        .buttonStyle(.glass)
+        .modifier(HeaderButtonStyle())
         .disabled(app.addons.isRefreshing)
     }
 
@@ -164,5 +164,17 @@ private struct AddonRow: View {
                 Button("Uninstall", systemImage: "trash", role: .destructive) { app.addons.remove(addon) }
             }
         }
+    }
+}
+
+/// On the Mac the toolbar capsule (`pageControls`) is the button's glass; elsewhere the button
+/// brings its own.
+private struct HeaderButtonStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(macOS)
+        content.buttonStyle(.borderless).padding(.horizontal, 6).padding(.vertical, 3)
+        #else
+        content.buttonStyle(.glass)
+        #endif
     }
 }
