@@ -45,7 +45,10 @@ struct HomeView: View {
             }
             .padding(.bottom, 40)
         }
-        .pageScrollEdge()
+        #if os(iOS)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        #endif
+        // No title-bar backdrop on the Mac's Home: the hero owns the top of the window.
         // Clamped at 0, so normal scrolling doesn't update state.
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             max(0, -(geometry.contentOffset.y + geometry.contentInsets.top))
