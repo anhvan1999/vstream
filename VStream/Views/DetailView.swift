@@ -120,9 +120,8 @@ struct DetailView: View {
                     endPoint: .bottom
                 )
             }
-            .backgroundExtensionEffect()
-            // Vertical only: the leading safe area is the sidebar, which the extension effect covers.
-            .ignoresSafeArea(edges: .vertical)
+            // Every edge: the artwork itself runs under the sidebar (not just a mirrored blur of it).
+            .ignoresSafeArea()
     }
 
     private func header(_ meta: MetaDetail) -> some View {

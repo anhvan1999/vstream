@@ -151,9 +151,12 @@ extension View {
     /// scrolled a title-bar-style backdrop (bar material and a hairline) appears behind the
     /// toolbar, the way a real title bar picks up its background; at the top the page shows
     /// through. iPhone/iPad use the soft fade under their floating bars.
-    func pageScrollEdge() -> some View {
+    /// `titleBar: false` for pages whose toolbar holds only the back button (See All pages): no
+    /// backdrop on the Mac there.
+    @ViewBuilder
+    func pageScrollEdge(titleBar: Bool = true) -> some View {
         #if os(macOS)
-        modifier(TitleBarBackdrop())
+        if titleBar { modifier(TitleBarBackdrop()) } else { self }
         #else
         scrollEdgeEffectStyle(.soft, for: .top)
         #endif

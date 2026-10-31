@@ -251,7 +251,7 @@ struct ContinueWatchingGridView: View {
             ScreenHeader(title: "Continue Watching", subtitle: "\(entries.count) titles")
             PosterGrid(items: entries) { ContinueWatchingCard(entry: $0) }
         }
-        .pageScrollEdge()
+        .pageScrollEdge(titleBar: false)
         .overlay {
             if entries.isEmpty {
                 EmptyStateView(title: "Nothing in progress", symbol: "play.circle", message: "Titles you start watching show up here.")
@@ -416,7 +416,7 @@ struct TraktListGridView: View {
             }
             if metas == nil, error == nil { ProgressView().padding() }
         }
-        .pageScrollEdge()
+        .pageScrollEdge(titleBar: false)
         .overlay {
             if let error, (metas ?? []).isEmpty {
                 EmptyStateView(title: "Couldn't load", symbol: "exclamationmark.triangle", message: error)
@@ -459,7 +459,8 @@ struct CatalogGridView: View {
             }
             if isLoading { ProgressView().padding() }
         }
-        .pageScrollEdge()
+        // Discover passes its pickers as the header (toolbar controls); See All only has a back button.
+        .pageScrollEdge(titleBar: header != nil)
         .navigationTitle(row.catalog.name)
         .task(id: "\(row.id)|\(genre ?? "")") {
             metas = []
