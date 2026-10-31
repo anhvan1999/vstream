@@ -95,13 +95,8 @@ struct RootView: View {
 
     private var sidebar: some View {
         List(selection: sidebarSelection) {
-            Section {
-                ForEach([SidebarItem.home, .search, .discover, .library, .playLink]) { item in
-                    Label(item.title, systemImage: item.symbol).tag(item)
-                }
-            }
-            Section("Manage") {
-                Label(SidebarItem.addons.title, systemImage: SidebarItem.addons.symbol).tag(SidebarItem.addons)
+            ForEach([SidebarItem.home, .search, .discover, .library, .playLink, .addons]) { item in
+                Label(item.title, systemImage: item.symbol).tag(item)
             }
         }
         .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
@@ -133,10 +128,8 @@ struct RootView: View {
             // iPad only: four tabs plus Search fill an iPhone tab bar (more would add "More"), so
             // there Addons is reached through Settings (⚙︎ on Library).
             if horizontalSizeClass != .compact {
-                TabSection("Manage") {
-                    Tab(SidebarItem.addons.title, systemImage: SidebarItem.addons.symbol, value: Optional(SidebarItem.addons)) {
-                        detailStack(content(for: .addons))
-                    }
+                Tab(SidebarItem.addons.title, systemImage: SidebarItem.addons.symbol, value: Optional(SidebarItem.addons)) {
+                    detailStack(content(for: .addons))
                 }
             }
         }
