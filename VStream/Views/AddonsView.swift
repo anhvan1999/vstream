@@ -13,19 +13,7 @@ struct AddonsView: View {
         // Header and install field sit above the List: inside a List row, AppKit paints its own
         // rectangular field background inside the rounded glass box.
         VStack(alignment: .leading, spacing: 0) {
-            ScreenHeader(title: "Addons", subtitle: "\(app.addons.addons.count) installed") {
-                Button("Browse Community Addons", systemImage: "globe") {
-                    openURL(URL(string: "https://stremio-addons.net")!)
-                }
-                .buttonStyle(.glass)
-                Button("Refresh", systemImage: "arrow.clockwise") {
-                    Task { await app.addons.refreshManifests() }
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.glass)
-                .disabled(app.addons.isRefreshing)
-
-            }
+            ScreenHeader(title: "Addons", subtitle: "\(app.addons.addons.count) installed") { controls }
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 10) {
@@ -72,8 +60,22 @@ struct AddonsView: View {
             .scrollContentBackground(.hidden)
         }
         .navigationTitle("Addons")
+        .pageControls { controls }
         .onAppear(perform: consumePendingURL)
         .onChange(of: app.pendingAddonURL) { consumePendingURL() }
+    }
+
+    @ViewBuilder private var controls: some View {
+        Button("Browse Community Addons", systemImage: "globe") {
+            openURL(URL(string: "https://stremio-addons.net")!)
+        }
+        .buttonStyle(.glass)
+        Button("Refresh", systemImage: "arrow.clockwise") {
+            Task { await app.addons.refreshManifests() }
+        }
+        .labelStyle(.iconOnly)
+        .buttonStyle(.glass)
+        .disabled(app.addons.isRefreshing)
     }
 
     private func consumePendingURL() {

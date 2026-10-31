@@ -2,8 +2,9 @@ import SwiftUI
 
 /// In-content header that replaces the window toolbar: title on the left, controls on the right.
 /// It is the first item of the page's scroll content, so it scrolls away instead of floating over posters.
-/// On the Mac and iPad a tab's own page shows only its controls (the highlighted sidebar row or tab
-/// already names it); pushed pages and iPhone, with its large titles, keep the title.
+/// On the Mac a tab's own page puts its controls in the window toolbar; on iPad it shows only the
+/// controls (the highlighted sidebar row or tab already names the page). Pushed pages and iPhone,
+/// with its large titles, keep the title.
 struct ScreenHeader<Controls: View>: View {
     @Environment(AppModel.self) private var app
     #if os(iOS)
@@ -14,6 +15,15 @@ struct ScreenHeader<Controls: View>: View {
     @ViewBuilder var controls: Controls
 
     var body: some View {
+        #if os(macOS)
+        // A tab's own page on the Mac: its controls are in the window toolbar (`pageControls`).
+        if showsTitle { inPageHeader }
+        #else
+        inPageHeader
+        #endif
+    }
+
+    private var inPageHeader: some View {
         Group {
             if isCompact {
                 // iPhone: a large title, with the controls on their own swipeable row below.
@@ -105,6 +115,25 @@ struct BackButton: View {
         horizontalSizeClass == .regular
         #else
         false
+        #endif
+    }
+}
+
+extension View {
+    /// The Mac shows a tab page's controls at the trailing end of the window toolbar.
+    /// Applied to the page itself, outside its scroll view, so they stay put while scrolling.
+    /// iPhone/iPad keep them in the page header.
+    func pageControls<Controls: View>(@ViewBuilder _ controls: () -> Controls) -> some View {
+        #if os(macOS)
+        toolbar {
+            // The spacer pushes the group to the trailing end (it would hug the sidebar otherwise).
+            ToolbarSpacer(.flexible)
+            ToolbarItemGroup {
+                controls().labelsHidden()
+            }
+        }
+        #else
+        self
         #endif
     }
 }

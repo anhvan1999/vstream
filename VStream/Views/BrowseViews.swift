@@ -27,6 +27,7 @@ struct DiscoverView: View {
             }
         }
         .navigationTitle("Discover")
+        .pageControls { controls }
         .onChange(of: type) {
             rowID = nil
             genre = nil
@@ -38,29 +39,31 @@ struct DiscoverView: View {
     }
 
     private var header: some View {
-        ScreenHeader(title: "Discover") {
-            Picker("Type", selection: $type) {
-                ForEach(types, id: \.self) { Text($0.capitalized).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .fixedSize()
+        ScreenHeader(title: "Discover") { controls }
+    }
 
-            Picker("Catalog", selection: Binding(get: { selectedRow?.id }, set: { rowID = $0; genre = nil })) {
-                ForEach(rowsForType) { row in
-                    Text("\(row.catalog.name) — \(row.addon.manifest.name)").tag(Optional(row.id))
+    @ViewBuilder private var controls: some View {
+        Picker("Type", selection: $type) {
+            ForEach(types, id: \.self) { Text($0.capitalized).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .fixedSize()
+
+        Picker("Catalog", selection: Binding(get: { selectedRow?.id }, set: { rowID = $0; genre = nil })) {
+            ForEach(rowsForType) { row in
+                Text("\(row.catalog.name) — \(row.addon.manifest.name)").tag(Optional(row.id))
+            }
+        }
+        .fixedSize()
+
+        if let genres = selectedRow?.catalog.genres, !genres.isEmpty {
+            Picker("Genre", selection: $genre) {
+                if selectedRow?.catalog.extra(named: "genre")?.isRequired != true {
+                    Text("All genres").tag(String?.none)
                 }
+                ForEach(genres, id: \.self) { Text($0).tag(Optional($0)) }
             }
             .fixedSize()
-
-            if let genres = selectedRow?.catalog.genres, !genres.isEmpty {
-                Picker("Genre", selection: $genre) {
-                    if selectedRow?.catalog.extra(named: "genre")?.isRequired != true {
-                        Text("All genres").tag(String?.none)
-                    }
-                    ForEach(genres, id: \.self) { Text($0).tag(Optional($0)) }
-                }
-                .fixedSize()
-            }
         }
     }
 
@@ -185,28 +188,7 @@ struct LibraryView: View {
 
     var body: some View {
         ScrollView {
-            ScreenHeader(title: "Library", subtitle: "\(items.count) items") {
-                #if os(iOS)
-                if horizontalSizeClass == .compact {
-                    // iPhone: no sidebar account badge, so Settings (and Addons) open here; first, so it
-                    // isn't scrolled off the end of the row.
-                    Button("Settings", systemImage: "gearshape") { app.showsSettings = true }
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.glass)
-                }
-                #endif
-                Picker("Type", selection: $filter) {
-                    Text("All").tag("all")
-                    Text("Movies").tag("movie")
-                    Text("Series").tag("series")
-                }
-                .pickerStyle(.segmented)
-                .fixedSize()
-                Picker("Sort", selection: $sort) {
-                    ForEach(Sort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                }
-                .fixedSize()
-            }
+            ScreenHeader(title: "Library", subtitle: "\(items.count) items") { controls }
             PosterGrid(items: items) { item in
                 Button {
                     app.path.append(MetaRoute(type: item.type, id: item.id, preview: nil))
@@ -228,6 +210,30 @@ struct LibraryView: View {
             }
         }
         .navigationTitle("Library")
+        .pageControls { controls }
+    }
+
+    @ViewBuilder private var controls: some View {
+        #if os(iOS)
+        if horizontalSizeClass == .compact {
+            // iPhone: no sidebar account badge, so Settings (and Addons) open here; first, so it
+            // isn't scrolled off the end of the row.
+            Button("Settings", systemImage: "gearshape") { app.showsSettings = true }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.glass)
+        }
+        #endif
+        Picker("Type", selection: $filter) {
+            Text("All").tag("all")
+            Text("Movies").tag("movie")
+            Text("Series").tag("series")
+        }
+        .pickerStyle(.segmented)
+        .fixedSize()
+        Picker("Sort", selection: $sort) {
+            ForEach(Sort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+        }
+        .fixedSize()
     }
 
     /// Cinemeta's image CDN works for any IMDb id, which covers items imported without artwork.

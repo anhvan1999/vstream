@@ -13,9 +13,9 @@ struct RootView: View {
         layout
         #if os(macOS)
         .toolbar(removing: .sidebarToggle)
-        // The toolbar stays (it carries the traffic lights) but is invisible except on Search,
-        // where it hosts the search field.
-        .toolbarBackgroundVisibility(showsToolbar ? .automatic : .hidden, for: .windowToolbar)
+        // Clear at the top of a page (the Home hero and detail artwork run up under it); the
+        // system fades its background in once content scrolls beneath it.
+        .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
         .toolbar(removing: .title)
         // Only the player goes full screen; the green button zooms this window instead.
         .fullScreenAllowed(false)
