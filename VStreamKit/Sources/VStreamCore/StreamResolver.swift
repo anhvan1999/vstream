@@ -259,11 +259,16 @@ public struct StreamPresentation: Sendable, Hashable {
             .filter { line in !metaMarkers.contains { line.contains($0) } && line != headline }
             .last
         let text = [stream.name, stream.details].compactMap { $0 }.joined(separator: "\n")
-        let lower = text.lowercased()
-        quality = ["2160p", "4k", "1440p", "1080p", "720p", "480p"].first { lower.contains($0) }.map { $0 == "4k" ? "2160p" : $0 }
+        // Whole words only: "DVD"/"BLUDV" aren't Dolby Vision, "HDRip" isn't HDR, "Wolfmax4k" isn't 4K.
+        quality = ["2160p", "4k", "1440p", "1080p", "720p", "480p"].first { Self.containsWord($0, in: text) }.map { $0 == "4k" ? "2160p" : $0 }
         var tags: [String] = []
-        for tag in ["DV", "HDR10+", "HDR10", "HDR", "REMUX", "HEVC", "x265", "AV1", "Atmos", "TrueHD", "DTS-HD", "DTS", "IMAX"] where text.range(of: tag, options: .caseInsensitive) != nil {
-            if tag == "HDR", tags.contains(where: { $0.hasPrefix("HDR") }) { continue }
+        // REMUX is usually glued to its source ("BDRemux", "UHDRemux"), so it matches anywhere.
+        let matches = { (tag: String) in
+            tag == "REMUX" ? text.range(of: tag, options: .caseInsensitive) != nil : Self.containsWord(tag, in: text)
+        }
+        for tag in ["DV", "HDR10+", "HDR10", "HDR", "REMUX", "HEVC", "x265", "AV1", "Atmos", "TrueHD", "DTS-HD", "DTS", "IMAX"] where matches(tag) {
+            // The most specific variant wins: HDR10+ over HDR10 over HDR, DTS-HD over DTS.
+            if tag.hasPrefix("HDR"), tags.contains(where: { $0.hasPrefix("HDR") }) { continue }
             if tag == "DTS", tags.contains("DTS-HD") { continue }
             tags.append(tag)
         }
@@ -271,6 +276,11 @@ public struct StreamPresentation: Sendable, Hashable {
         size = Self.capture(#"💾\s*([\d.,]+\s*[KMGT]B)"#, in: text) ?? Self.capture(#"([\d.,]+\s*[GM]B)"#, in: text)
         seeders = Self.capture(#"👤\s*(\d+)"#, in: text)
         source = Self.capture(#"⚙️\s*([^\n]+)"#, in: text)
+    }
+
+    private static func containsWord(_ word: String, in text: String) -> Bool {
+        let pattern = "(?<![A-Za-z0-9])" + NSRegularExpression.escapedPattern(for: word) + "(?![A-Za-z0-9])"
+        return text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     private static func capture(_ pattern: String, in text: String) -> String? {

@@ -112,7 +112,10 @@ public struct LibraryItemState: Codable, Sendable, Hashable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         func number<T: FixedWidthInteger & Decodable>(_ key: CodingKeys) -> T {
             if let value = try? container.decode(T.self, forKey: key) { return value }
-            if let value = try? container.decode(Double.self, forKey: key), value >= 0 { return T(clamping: Int64(value)) }
+            // Clamp before converting: Int64(_:) traps on doubles past its range (e.g. 1e20).
+            if let value = try? container.decode(Double.self, forKey: key), value >= 0 {
+                return value >= Double(Int64.max) ? T.max : T(clamping: Int64(value))
+            }
             return 0
         }
         lastWatched = StremioAPIDate.parse(try? container.decodeIfPresent(String.self, forKey: .lastWatched))

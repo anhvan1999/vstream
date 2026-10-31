@@ -56,7 +56,11 @@ public struct RealDebridProvider: DebridProvider {
 
         // `links` lists one entry per *selected* file, in file order.
         let selectedFiles = (info["files"] as? [[String: Any]] ?? []).filter { ($0["selected"] as? Int) == 1 }
-        let linkIndex = selectedFiles.firstIndex { $0.int("id").map(String.init) == selected.id } ?? 0
+        // A torrent already downloaded with other files selected has no link for this one; falling
+        // back to the first link would play a different file.
+        guard let linkIndex = selectedFiles.firstIndex(where: { $0.int("id").map(String.init) == selected.id }) else {
+            throw DebridError.noPlayableFile
+        }
         let links = info["links"] as? [String] ?? []
         guard links.indices.contains(linkIndex) else { throw DebridError.noPlayableFile }
 

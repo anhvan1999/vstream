@@ -184,6 +184,15 @@ public struct MetaDetail: Codable, Sendable, Hashable, Identifiable {
         try container.encode(writer, forKey: .writer)
         try container.encode(trailers, forKey: .trailers)
         try container.encode(links, forKey: .links)
+        // Same date format as Video, so `StremioDate.parse` reads it back.
+        try container.encodeIfPresent(released.map { ISO8601DateFormatter().string(from: $0) }, forKey: .released)
+        try container.encodeIfPresent(country, forKey: .country)
+        try container.encodeIfPresent(website, forKey: .website)
+        if defaultVideoId != nil || hasScheduledVideos {
+            var hints = container.nestedContainer(keyedBy: HintKeys.self, forKey: .behaviorHints)
+            try hints.encodeIfPresent(defaultVideoId, forKey: .defaultVideoId)
+            if hasScheduledVideos { try hints.encode(true, forKey: .hasScheduledVideos) }
+        }
     }
 
     public var seasons: [Int] {

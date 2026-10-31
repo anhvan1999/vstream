@@ -136,6 +136,7 @@ public struct StreamBehaviorHints: Codable, Sendable, Hashable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(notWebReady, forKey: .notWebReady)
         try container.encodeIfPresent(bingeGroup, forKey: .bingeGroup)
+        if !countryWhitelist.isEmpty { try container.encode(countryWhitelist, forKey: .countryWhitelist) }
         try container.encodeIfPresent(filename, forKey: .filename)
         try container.encodeIfPresent(videoSize, forKey: .videoSize)
         try container.encodeIfPresent(videoHash, forKey: .videoHash)

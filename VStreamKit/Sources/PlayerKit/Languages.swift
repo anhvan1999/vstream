@@ -51,7 +51,9 @@ public enum Languages {
 
     public static func option(for code: String?) -> LanguageOption? {
         guard let code = code?.lowercased(), !code.isEmpty else { return nil }
-        return byCode[code] ?? byCode[String(code.prefix(3))]
+        // "en-US", "pt_BR", "eng-GB": try the language part before any region.
+        let language = code.split(whereSeparator: { $0 == "-" || $0 == "_" }).first.map(String.init) ?? code
+        return byCode[code] ?? byCode[language] ?? byCode[String(code.prefix(3))]
     }
 
     /// Human-readable name for any code, falling back to the system's localisation.

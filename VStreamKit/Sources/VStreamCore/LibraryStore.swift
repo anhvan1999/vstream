@@ -139,13 +139,15 @@ public final class LibraryStore {
         var item = items[meta.id] ?? LibraryItem(meta: meta)
         refreshPresentation(&item, from: meta)
         let now = Date()
-        if item.state.videoId != videoID {
+        // Movies keep `videoId` nil, so compare against what this call would store.
+        let storedVideoID = meta.type == "movie" ? nil : videoID
+        if item.state.videoId != storedVideoID {
             item.state.timeWatched = 0
         }
         let delta = positionMS > item.state.timeOffset ? min(positionMS - item.state.timeOffset, 15_000) : 0
         item.state.timeWatched += delta
         item.state.overallTimeWatched += delta
-        item.state.videoId = meta.type == "movie" ? nil : videoID
+        item.state.videoId = storedVideoID
         item.state.timeOffset = positionMS
         item.state.duration = durationMS
         item.state.lastWatched = now
